@@ -1,0 +1,22 @@
+# Telegram — live search across every chat this account is in
+$ tg-search.sh "аренда байка" --limit 5 --dialogs 250
+# query='аренда байка' matches=5 scanned_dialogs=250
+  [2026-08-15] Дананг Общение Недвижимость Жизнь: 🏠 Пересдам студию — район Сон Тра, Дананг
+               💰 7 350 000 VND/месяц. До пляжа 5 минут на байке, байк можно взять у хозяина
+      @seller_one https://t.me/danangj/54754
+  [2026-07-25] Дананг Общение Недвижимость Жизнь: Сдам в субаренду 1BR. Период: 1 августа –
+               5 сентября. Байк в аренду 1.200.000₫/мес
+      @seller_two https://t.me/danangj/53668
+
+# what can this account see at all?
+$ tg-search.sh --dialogs-list --limit 5
+supergroup  | ПАТТАЙЯ ЧАТ 🇹🇭 ONLINE | @pattayachatonline | id=1676417761
+supergroup  | САМУИ ЧАТ🌴(жители и отдыхающие) | @SamuiGroup | id=1247910513
+supergroup  | Дананг Чат Объявления | @danang3 | id=1531771102
+
+# several queries in ONE session — parallel calls fight over the session lock
+$ tg-search.sh --batch '[{"query":"скутер"},{"query":"xe máy","limit":40}]'
+
+# find your own messages inside one chat, with surrounding context
+$ tg-search.sh --in @somechat "стрим" --mine --limit 3
+$ tg-search.sh --context @somechat 106157 --before 20 --after 20

@@ -1,0 +1,10 @@
+node_modules/
+__pycache__/
+*.pyc
+.env
+*.session
+*.session-journal
+*.cookies.txt
+fb_marketplace_graphql.json
+fb_local_state.json
+.DS_Store

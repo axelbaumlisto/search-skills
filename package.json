@@ -1,0 +1,13 @@
+{
+  "name": "search-skills",
+  "version": "1.0.0",
+  "description": "Agent skills for live search on Shopee VN, Facebook Marketplace and Telegram, using your own logged-in sessions.",
+  "license": "MIT",
+  "private": false,
+  "scripts": {
+    "shot": "node docs/shot.mjs"
+  },
+  "dependencies": {
+    "playwright": "^1.47.0"
+  }
+}

@@ -1,0 +1,5 @@
+# telegram-search
+telethon>=1.36
+# facebook: stdlib only (urllib + http.cookiejar) — nothing to install
+# shopee cookie export: stdlib + pycryptodome for the AES-128-CBC Chrome cookie blob
+pycryptodome>=3.20

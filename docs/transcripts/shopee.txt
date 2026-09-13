@@ -1,0 +1,34 @@
+# Shopee VN — search runs headless with the session exported from your Chrome
+$ shopee.sh "giày nike nam" --limit 3 --sort sales
+{
+  "keyword": "giày nike nam",
+  "sort": "sales",
+  "total_count": 4307,
+  "returned": 3,
+  "items": [
+    {
+      "name": "Giày thể thao nam LAKINTA giày nam chất liệu vải thoáng khí đế cao su GF69",
+      "price_vnd": 245520,
+      "original_price_vnd": 299000,
+      "discount_pct": 18,
+      "sold": 176618,
+      "sold_month": 149367,
+      "rating": 4.81,
+      "shop": "Lakinta",
+      "location": "Thành phố Hà Nội",
+      "url": "https://shopee.vn/product/547188274/24319976398"
+    },
+    ...
+  ]
+}
+
+# the search price is the CHEAPEST variant — always re-price through `item`
+$ shopee.sh item https://shopee.vn/product/547188274/24319976398 --desc
+{
+  "name": "Giày thể thao nam LAKINTA ...",
+  "price_min_vnd": 245520,
+  "price_max_vnd": 299000,
+  "variations": [ { "name": "Màu", "options": ["Đen", "Trắng"] },
+                  { "name": "Size", "options": ["39", "40", "41", "42", "43"] } ],
+  "models": [ { "name": "Đen,40", "price_vnd": 245520, "stock": 87 }, ... ]
+}

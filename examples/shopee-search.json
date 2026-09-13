@@ -1,0 +1,39 @@
+{
+  "keyword": "giày nike nam",
+  "sort": "sales",
+  "page": 0,
+  "total_count": 4307,
+  "returned": 2,
+  "items": [
+    {
+      "name": "Giày thể thao nam LAKINTA giày nam chất liệu vải thoáng khí đế cao su GF69",
+      "price_vnd": 245520,
+      "original_price_vnd": 299000,
+      "discount_pct": 18,
+      "sold": 176618,
+      "sold_month": 149367,
+      "rating": 4.811916726489591,
+      "liked": 2135,
+      "shop": "Lakinta",
+      "location": "Thành phố Hà Nội",
+      "sold_out": false,
+      "image": "https://down-vn.img.susercontent.com/file/vn-11134207-7r98o-lt3mz9ox97rtf1",
+      "url": "https://shopee.vn/product/547188274/24319976398"
+    },
+    {
+      "name": "Giày Asia, Giày Cầu Lông Thể Thao Cao Cấp Nam Nữ",
+      "price_vnd": 201520,
+      "original_price_vnd": 229000,
+      "discount_pct": 12,
+      "sold": 154389,
+      "sold_month": 48434,
+      "rating": 4.931768650461023,
+      "liked": 10422,
+      "shop": "BÓNG ĐÁ XP",
+      "location": "Thành phố Hồ Chí Minh",
+      "sold_out": false,
+      "image": "https://down-vn.img.susercontent.com/file/vn-11134207-820l4-mfmdzn0ipz4e33",
+      "url": "https://shopee.vn/product/162160612/23334074942"
+    }
+  ]
+}
