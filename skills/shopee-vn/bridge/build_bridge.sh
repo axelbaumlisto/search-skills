@@ -3,19 +3,20 @@
 # user's real, logged-in Chrome. Shopee refuses cart writes from any automated browser.
 #
 #   ./build_bridge.sh                 # installs to ~/Applications/ChromeBridge.app
-#   BRIDGE_DIR=/tmp/x ./build_bridge.sh
+#   SHOPEE_BRIDGE_DIR=/tmp/x ./build_bridge.sh   # must match the value used at runtime
 #
 # Why an applet and not `osascript` directly:
 #   * macOS binds Automation (TCC) permission to a *bundle identifier*. A bare script
 #     has none, so every call re-prompts or silently fails.
 #   * `~/Applications` is deliberate: system permission pickers cannot browse into a
-#     dotted path like ~/.pi, so an applet hidden there can never be granted by hand.
+#     dotted path like ~/.config, so an applet hidden there can never be granted by hand.
 set -euo pipefail
 
 APP="${SHOPEE_BRIDGE_APP:-$HOME/Applications/ChromeBridge.app}"
-DIR="${BRIDGE_DIR:-/tmp/search-skills-bridge}"
+DIR="${SHOPEE_BRIDGE_DIR:-${BRIDGE_DIR:-$HOME/.config/search-skills/bridge}}"
 BUNDLE_ID="${BRIDGE_BUNDLE_ID:-works.search-skills.chromebridge}"
-SRC="$(mktemp -t chromebridge).applescript"
+TD="$(mktemp -d)"; SRC="$TD/chromebridge.applescript"
+trap 'rm -rf "$TD"' EXIT
 
 mkdir -p "$(dirname "$APP")" "$DIR"
 chmod 700 "$DIR"
@@ -35,7 +36,7 @@ on run
 	on error errMsg number errNum
 		set txt to "ERR " & errNum & " " & errMsg
 	end try
-	do shell script "printf '%s' " & quoted form of txt & " > " & outFile
+	do shell script "printf '%s' " & quoted form of txt & " > " & quoted form of outFile
 end run
 AS
 
@@ -44,7 +45,6 @@ osacompile -o "$APP" "$SRC"
 /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier $BUNDLE_ID" "$APP/Contents/Info.plist"
 # An ad-hoc signature gives the bundle a stable TCC identity that survives edits.
 codesign --force --deep -s - "$APP"
-rm -f "$SRC"
 
 cat <<MSG
 built: $APP   (bundle id: $BUNDLE_ID, staging dir: $DIR)

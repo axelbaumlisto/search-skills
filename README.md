@@ -6,14 +6,15 @@ logged-in session, returns structured JSON, and documents the anti-bot walls it
 had to get through — so an LLM agent (or you) can ask "what does this cost here,
 who sells it, and what do buyers complain about" and get a real answer.
 
-| Skill | What it answers | Path |
+| Skill | What it answers | How |
 |---|---|---|
 | [shopee-vn](skills/shopee-vn/SKILL.md) | VN online prices, sold counts, variants, reviews, cart, order history | headless Chromium + the real Chrome for writes |
 | [fb-marketplace](skills/fb-marketplace/SKILL.md) | second-hand prices in a specific city, seller listings, Page reviews | plain HTTP replay of the Marketplace GraphQL query |
 | [telegram-search](skills/telegram-search/SKILL.md) | what people actually post in local chats: listings, contacts, rentals | Telethon over your joined chats |
 
-No scraping farm, no proxies, no fake accounts: every skill is a thin, paced
-wrapper around a session you already have.
+No scraping farm, no proxies, no account farms: every skill is a thin, paced
+wrapper around a session you already have. (A separate secondary account for
+classifieds is recommended for Telegram — see that skill's doc.)
 
 ---
 
@@ -56,21 +57,24 @@ S=./skills/fb-marketplace/scripts
 $S/fb-search.sh "iphone 15" danang --limit 10
 $S/fb-search.sh "giày" hcmc --min 300000 --max 3000000
 $S/fb-search.sh "google pixel" --lat 9.5120 --lng 100.0136 --radius 25
+$S/fb-search.sh "giày" hcmc --days 7 --shipping     # fresh listings, shipping only
 $S/fb-cookies.sh                                   # session alive? budget left?
 python3 $S/fb_reviews.py <page-slug>               # "92% recommend (37 reviews)"
 ```
 
 The default path sends **one HTTPS request** — it replays the same GraphQL query
 the Marketplace page makes, with your cookies and a freshly scraped `fb_dtsg`.
-Geo is real (lat/lng/radius), and the wrapper refuses to show wrong-city results
-instead of silently falling back to your account's location.
+Geo is real (lat/lng/radius) for the preset cities and for any coordinates you
+pass. With no city and no coordinates the search falls back to your account's
+location and says so: `geo_verified: false` plus a warning line.
 
 Because this runs on a real personal account it is paced on purpose: ≥4 s +
 jitter between requests, 40 requests/hour, and hard-stop detection of Facebook's
 checkpoint markers (exit code 4 means *stop*, not *retry*).
 
 Cities preset: `bangkok pattaya phuket samui phangan chiangmai krabi danang hcmc
-hanoi nhatrang hoian` — anything else via `--lat/--lng/--radius`.
+saigon hanoi nhatrang hoian` — anything else via `--lat/--lng/--radius`.
+Exit codes matter here: `4` means Facebook flagged the session — stop, never retry.
 
 ## Telegram — what people post in local chats
 
@@ -95,12 +99,20 @@ exists.
 
 ## Install
 
+Requires Node 18+ and Python 3.10+.
+
 ```bash
-git clone <this repo> && cd search-skills
-npm install                     # playwright, for the Shopee skill and doc shots
-pip install -r requirements.txt # telethon + pycryptodome
+git clone https://github.com/axelbaumlisto/search-skills && cd search-skills
+npm install                                   # playwright, for the Shopee skill and doc shots
+python3 -m venv .venv && ./.venv/bin/pip install -r requirements.txt
+export PYTHON_BIN="$PWD/.venv/bin/python"     # every wrapper honours this
+
+mkdir -p ~/.config/search-skills
 cp .env.example ~/.config/search-skills/.env && chmod 600 ~/.config/search-skills/.env
 ```
+
+Note: only the Telegram scripts read that `.env`. Shopee and Facebook variables
+must be exported in your shell (they all have working defaults).
 
 Then per skill, once:
 
@@ -118,9 +130,12 @@ Then per skill, once:
 ./skills/telegram-search/scripts/tg-search.sh --login
 ```
 
-Everything mutable lives in `~/.config/search-skills/` (cookies, sessions,
-rate-limit state, GraphQL template) — nothing secret is ever written into the
-repo, and `.gitignore` blocks the obvious mistakes.
+Every credential lives in `~/.config/search-skills/` (cookies, sessions,
+rate-limit state, GraphQL template); the only other runtime paths are the
+bridge staging dir `/tmp/search-skills-bridge` and the remote job's temp files.
+`.gitignore` covers sessions, cookie jars and the captured template — but the
+repo can only protect what you keep out of it, so check `git status` before
+your first push.
 
 ## Layout
 
@@ -128,8 +143,10 @@ repo, and `.gitignore` blocks the obvious mistakes.
 skills/<name>/SKILL.md      agent-facing doc: commands + hard-won rules
 skills/<name>/scripts/      the actual CLI, one concern per file
 shared/chrome_cookies.py    export cookies for a host from the local Chrome (macOS Keychain)
-examples/*.json             real, trimmed output of each skill
+examples/*.json             real output of each skill, trimmed and redacted
 docs/shot.mjs               render a terminal transcript into a README screenshot
+tests/run.sh                everything checkable without a live session: syntax,
+                            unit tests for the GraphQL/parsing layer, secret scan
 ```
 
 Each `SKILL.md` is written to be dropped into an agent harness (Claude Code /

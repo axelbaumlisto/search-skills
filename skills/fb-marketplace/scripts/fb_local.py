@@ -34,8 +34,9 @@ from pathlib import Path
 import os
 
 def _env_path(name: str, default: Path) -> Path:
-    """Empty or unset env var -> default (wrappers pass empty strings)."""
-    return Path(os.environ.get(name) or default)
+    """Empty or unset env var -> default; a leading ~ is expanded (shells do not
+    expand it inside a variable value)."""
+    return Path(os.path.expanduser(os.environ.get(name) or str(default)))
 
 
 HOME_DIR = _env_path("SEARCH_SKILLS_HOME", Path.home() / ".config" / "search-skills")
@@ -73,6 +74,7 @@ def _load_state() -> dict:
 def _save_state(st: dict) -> None:
     STATE.parent.mkdir(parents=True, exist_ok=True)
     STATE.write_text(json.dumps(st))
+    STATE.chmod(0o600)  # the cached fb_dtsg is session material
 
 
 def _throttle() -> None:

@@ -1,18 +1,18 @@
 # Telegram — live search across every chat this account is in
 $ tg-search.sh "аренда байка" --limit 5 --dialogs 250
 # query='аренда байка' matches=5 scanned_dialogs=250
-  [2026-08-15] Дананг Общение Недвижимость Жизнь: 🏠 Пересдам студию — район Сон Тра, Дананг
+  [2026-08-15] Expats — rent & sell: 🏠 Пересдам студию — район Сон Тра, Дананг
                💰 7 350 000 VND/месяц. До пляжа 5 минут на байке, байк можно взять у хозяина
-      @seller_one https://t.me/danangj/54754
-  [2026-07-25] Дананг Общение Недвижимость Жизнь: Сдам в субаренду 1BR. Период: 1 августа –
+      @seller_one https://t.me/examplechat2/1001
+  [2026-07-25] Expats — rent & sell: Сдам в субаренду 1BR. Период: 1 августа –
                5 сентября. Байк в аренду 1.200.000₫/мес
-      @seller_two https://t.me/danangj/53668
+      @seller_two https://t.me/examplechat2/1002
 
 # what can this account see at all?
 $ tg-search.sh --dialogs-list --limit 5
-supergroup  | ПАТТАЙЯ ЧАТ 🇹🇭 ONLINE | @pattayachatonline | id=1676417761
-supergroup  | САМУИ ЧАТ🌴(жители и отдыхающие) | @SamuiGroup | id=1247910513
-supergroup  | Дананг Чат Объявления | @danang3 | id=1531771102
+supergroup  | City Chat · Classifieds | @examplechat1 | id=1000000001
+supergroup  | Expats — rent & sell    | @examplechat2 | id=1000000002
+supergroup  | Мото и скутеры          | @examplechat3 | id=1000000003
 
 # several queries in ONE session — parallel calls fight over the session lock
 $ tg-search.sh --batch '[{"query":"скутер"},{"query":"xe máy","limit":40}]'

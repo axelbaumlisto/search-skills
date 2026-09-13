@@ -2,11 +2,11 @@
 $ fb-search.sh "iphone 15" danang --limit 5
 # query='iphone 15' count=5 backend=graphql-local geo_verified=True
         ₫14,500?  Đà Nẵng - pass iphone 15 pro đen 128GB LLA
-                  https://www.facebook.com/marketplace/item/28315710671427948/
+                  https://www.facebook.com/marketplace/item/000000000000001/
         ₫14,000?  Iphone 15 pro 128gb like new
-                  https://www.facebook.com/marketplace/item/38092547627055863/
+                  https://www.facebook.com/marketplace/item/000000000000002/
         ₫12,800?  Bán iPhone 15 Pro 128gb Quốc tế
-                  https://www.facebook.com/marketplace/item/27539191842421912/
+                  https://www.facebook.com/marketplace/item/000000000000003/
   # '?' = price implausible (seller typed shorthand) — read the real number in the title
 
 # any coordinates, not just the presets
@@ -21,5 +21,5 @@ session : alive as uid <redacted>
 budget  : 3/40 requests this hour | pacing 4.0s + up to 3.0s jitter
 
 # reviews of a business Page (mbasic still ships them as static HTML)
-$ python3 fb_reviews.py gachkinhdanang
+$ python3 fb_reviews.py <page-slug>
 92% recommend (37 reviews)

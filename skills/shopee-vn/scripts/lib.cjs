@@ -2,8 +2,9 @@
 const fs = require('fs'); const os = require('os'); const path = require('path');
 const PW = process.env.NODE_PATH ? require(path.join(process.env.NODE_PATH, 'playwright')) : require('playwright');
 
-const COOKIE_FILE = process.env.SHOPEE_COOKIES
-  || path.join(process.env.SHOPEE_HOME || path.join(os.homedir(), '.config/search-skills'), 'shopee.cookies.txt');
+const CONF_DIR = process.env.SHOPEE_HOME || process.env.SEARCH_SKILLS_HOME
+  || path.join(os.homedir(), '.config/search-skills');
+const COOKIE_FILE = process.env.SHOPEE_COOKIES || path.join(CONF_DIR, 'shopee.cookies.txt');
 const UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
 
 const vnd = (v) => (v ? Math.round(v / 100000) : null);

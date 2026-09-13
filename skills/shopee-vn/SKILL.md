@@ -1,6 +1,6 @@
 ---
-name: shopee-search
-description: Search Shopee Vietnam (shopee.vn) as the logged-in user and manage that account's cart — live prices, sold counts, ratings, shop and location, plus add/remove items and change quantities. Use when the user asks what something costs in Vietnam, wants to compare VN online prices, find a seller/shop on Shopee, check demand ("сколько продано"), or wants something put in the cart — "поищи на шопи", "shopee", "цены во Вьетнаме", "положи в корзину", "добавь в корзину", "что у меня в корзине".
+name: shopee-vn
+description: Search Shopee Vietnam (shopee.vn) as the logged-in user, judge a product by its 1-star reviews and real package contents, list past orders with what was actually charged, and manage that account's cart — live prices, sold counts, ratings, shop and location, plus add/remove items and change quantities. Use when the user asks what something costs in Vietnam, wants to compare VN online prices, find a seller/shop on Shopee, check demand ("сколько продано"), wants something put in the cart, or asks what buyers complain about — "shopee", "VN price", "what's wrong with this product", "my orders", "поищи на шопи", "цены во Вьетнаме", "отзывы", "положи в корзину", "мои заказы".
 ---
 
 # Shopee VN: search + cart (authenticated)
@@ -12,7 +12,7 @@ profile, capturing the search XHR the page itself makes. Cart **writes** cannot 
 ## Commands
 
 ```bash
-S=./skills/shopee-vn/scripts/shopee.sh
+S=<repo>/skills/shopee-vn/scripts/shopee.sh   # ./scripts/shopee.sh relative to this SKILL.md
 
 $S "giày nike" --limit 10 --sort sales                   # implicit `search`
 $S search "máy pha cà phê" --sort price_asc --min 1000000 --max 5000000

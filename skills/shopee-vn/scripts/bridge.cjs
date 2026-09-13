@@ -12,8 +12,15 @@ const { execFileSync } = require('child_process');
 // Keep the applet in a *visible* folder: macOS permission pickers cannot browse into ~/.pi
 const APP = process.env.SHOPEE_BRIDGE_APP || path.join(os.homedir(), 'Applications/ChromeBridge.app');
 const RUNNER = path.join(__dirname, 'bridge_run.applescript');
-const TMP = process.env.SHOPEE_BRIDGE_DIR || '/tmp/search-skills-bridge';
+const CONF_DIR = process.env.SEARCH_SKILLS_HOME || path.join(os.homedir(), '.config/search-skills');
+const TMP = process.env.SHOPEE_BRIDGE_DIR || path.join(CONF_DIR, 'bridge');
 fs.mkdirSync(TMP, { recursive: true, mode: 0o700 });
+// Whatever lands here is executed inside the logged-in Chrome, so a dir owned by
+// someone else (or group/world-writable) is a code-injection channel, not a nuisance.
+const st = fs.statSync(TMP);
+if (st.uid !== process.getuid() || (st.mode & 0o022)) {
+  throw new Error(`bridge: refusing unsafe staging dir ${TMP} (must be owned by you, mode 700)`);
+}
 const JS_IN = path.join(TMP, 'shopee_js.js');
 const JS_OUT = path.join(TMP, 'shopee_js.out');
 const AS = path.join(TMP, 'shopee_as.applescript');
@@ -39,7 +46,8 @@ async function runJS(js, { timeoutMs = 50000 } = {}) {
 
 /** Run a JS snippet from scripts/js/<name>.js, substituting __TOKEN__ placeholders. */
 async function runFile(name, vars = {}, opts) {
-  let js = fs.readFileSync(path.join(__dirname, 'js', `${name}.js`), 'utf8');
+  const prelude = fs.readFileSync(path.join(__dirname, 'js', '_prelude.js'), 'utf8');
+  let js = `${prelude}\n${fs.readFileSync(path.join(__dirname, 'js', `${name}.js`), 'utf8')}`;
   for (const [k, v] of Object.entries(vars)) js = js.split(`__${k}__`).join(v);
   return runJS(js, opts);
 }

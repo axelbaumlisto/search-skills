@@ -8,6 +8,7 @@
 #   tg-search.sh "плов" --account research            # a second, separate account
 #   tg-search.sh --dialogs-list --limit 40            # what this account can see
 #   tg-search.sh --in @somechat "стрим" --mine        # inside one chat, only my messages
+#   tg-search.sh --in @somechat --sender @someone     # …or only one author
 #   tg-search.sh --context @somechat 106157 --before 20 --after 20
 #   tg-search.sh --batch '[{"query":"a"},{"query":"b","limit":40}]'
 #   tg-search.sh "nails" --raw                        # JSON instead of the table
@@ -18,11 +19,11 @@
 set -uo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
-PY="${PYTHON_BIN:-python3}"
+. "$HERE/../../../shared/common.sh"
 READER="$HERE/tg_reader.py"
 
 QUERY=""; ACCOUNT="default"; LIMIT=20; DIALOGS=200; RAW=0; BATCH=""; MODE="search"
-CHANNEL=""; DATE_FROM=""; DATE_TO=""; CHAT=""; MINE=0; AROUND=""; BEFORE=10; AFTER=10
+CHANNEL=""; DATE_FROM=""; DATE_TO=""; CHAT=""; MINE=0; SENDER=""; AROUND=""; BEFORE=10; AFTER=10
 while [ $# -gt 0 ]; do
   case "$1" in
     --account) ACCOUNT="$2"; shift 2;;
@@ -33,6 +34,7 @@ while [ $# -gt 0 ]; do
     --until|--date-to) DATE_TO="$2"; shift 2;;
     --in) CHAT="$2"; MODE="chat"; shift 2;;
     --mine) MINE=1; shift;;
+    --sender) SENDER="$2"; shift 2;;
     --context) CHAT="$2"; AROUND="$3"; MODE="context"; shift 3;;
     --before) BEFORE="$2"; shift 2;;
     --after) AFTER="$2"; shift 2;;
@@ -40,7 +42,7 @@ while [ $# -gt 0 ]; do
     --dialogs-list) MODE="dialogs"; shift;;
     --login) MODE="login"; shift;;
     --raw) RAW=1; shift;;
-    -h|--help) sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'; exit 0;;
+    -h|--help) show_help "$0"; exit 0;;
     *) QUERY="$1"; shift;;
   esac
 done
@@ -49,9 +51,8 @@ if [ "$MODE" = "login" ]; then
   exec "$PY" "$HERE/tg_login.py" --account "$ACCOUNT"
 fi
 
-# A killed-but-unreaped sibling keeps the session lock and every later call reports
-# "session is busy" — clear it before starting.
-pgrep -f "tg_reader.py" >/dev/null 2>&1 && { pkill -f "tg_reader.py"; sleep 2; }
+# Concurrency is handled by the flock inside tg_reader.py, which names the lock file in
+# its error. Never pkill by name: that also kills a healthy run for another account.
 
 case "$MODE" in
   dialogs) ARGS=(list_dialogs --limit "$LIMIT");;
@@ -61,6 +62,7 @@ case "$MODE" in
     ARGS=(search_chat --chat "$CHAT" --limit "$LIMIT")
     [ -n "$QUERY" ] && ARGS+=(--query "$QUERY")
     [ "$MINE" = 1 ] && ARGS+=(--mine)
+    [ -n "$SENDER" ] && ARGS+=(--sender "$SENDER")
     [ -n "$DATE_FROM" ] && ARGS+=(--date-from "$DATE_FROM")
     [ -n "$DATE_TO" ] && ARGS+=(--date-to "$DATE_TO");;
   search)
@@ -71,14 +73,14 @@ case "$MODE" in
     [ -n "$DATE_TO" ]   && ARGS+=(--date-to "$DATE_TO");;
 esac
 
-ERRLOG="$(mktemp -t tg-search)"
+ERRLOG="$(mktemp -t tg-search.XXXXXX)"
+trap 'rm -f "$ERRLOG"' EXIT
 OUT=$("$PY" "$READER" --account "$ACCOUNT" "${ARGS[@]}" 2>"$ERRLOG"); RC=$?
 if [ $RC -ne 0 ] || [ -z "$OUT" ]; then
   echo "FAILED rc=$RC stderr: $(head -c 400 "$ERRLOG")" >&2
   grep -q "AuthKey" "$ERRLOG" 2>/dev/null && echo "hint: session dead -> tg-search.sh --login" >&2
-  rm -f "$ERRLOG"; exit 1
+  exit 1
 fi
-rm -f "$ERRLOG"
 
 if [ "$RAW" = 1 ]; then printf '%s\n' "$OUT"; exit 0; fi
 printf '%s' "$OUT" | "$PY" "$HERE/_format.py"

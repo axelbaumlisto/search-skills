@@ -5,8 +5,8 @@
 #   shopee.sh item https://shopee.vn/product/<shop>/<item>   # variants + prices
 #   shopee.sh item <url> --desc                         # + description = real set contents
 #   shopee.sh cart                                      # read the live cart
-#   shopee.sh orders                                    # заказы: статус, сумма, сроки
-#   shopee.sh reviews <url> [--live --stars 1]          # отзывы, в т.ч. однозвёздочные
+#   shopee.sh orders                                    # past orders: status, total, ETA
+#   shopee.sh reviews <url> [--live --stars 1]          # reviews, incl. the 1-star bucket
 #   shopee.sh add <url> --variant "Trắng" --variant "Combo 2 khăn 70x140" --qty 2
 #   shopee.sh qty 0 3                                   # row index -> new quantity
 #   shopee.sh rm 0                                      # delete a cart row
@@ -25,16 +25,14 @@ set -uo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$HERE/../../.." && pwd)"
+. "$ROOT/shared/common.sh"
 
-# Everything is overridable through the environment; see .env.example in the repo root.
-CONF_DIR="${SHOPEE_HOME:-$HOME/.config/search-skills}"
-COOKIES="${SHOPEE_COOKIES:-$CONF_DIR/shopee.cookies.txt}"
-NODE_MODULES="${SHOPEE_NODE_MODULES:-$ROOT/node_modules}"
-PY="${PYTHON_BIN:-python3}"
+COOKIES="$(expand_tilde "${SHOPEE_COOKIES:-$CONF_DIR/shopee.cookies.txt}")"
+NODE_MODULES="$(expand_tilde "${SHOPEE_NODE_MODULES:-$ROOT/node_modules}")"
 EXPORTER="${COOKIE_EXPORTER:-$ROOT/shared/chrome_cookies.py}"
-CHROME_PROFILE="${CHROME_PROFILE:-Default}"
-mkdir -p "$CONF_DIR"
-UA="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36"
+# One user agent for the whole session: the headless browser and this curl must match,
+# otherwise the account-info probe and the search look like two different clients.
+UA="$(SHOPEE_LIB="$HERE/lib.cjs" NODE_PATH="$NODE_MODULES" node -e 'process.stdout.write(require(process.env.SHOPEE_LIB).UA)')"
 
 refresh() {
   "$PY" "$EXPORTER" shopee.vn --profile "$CHROME_PROFILE" --out "$COOKIES" >/dev/null || {
@@ -54,7 +52,7 @@ print("logged in:", d.get("username"), "| userid", d.get("userid")) if d.get("us
 case "${1:-}" in
   --refresh-cookies) refresh; exit $?;;
   --check) check; exit $?;;
-  -h|--help|"") awk 'NR>1 && /^#/ {sub(/^# ?/,""); print; next} NR>1 {exit}' "$0"; exit 0;;
+  -h|--help|"") show_help "$0"; exit 0;;
 esac
 
 [ -f "$COOKIES" ] || refresh || exit 1

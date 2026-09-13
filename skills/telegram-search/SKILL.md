@@ -12,7 +12,7 @@ hits Telegram, so results are always current.
 ## Usage
 
 ```bash
-S=./skills/telegram-search/scripts
+S=<repo>/skills/telegram-search/scripts   # ./scripts relative to this SKILL.md
 
 $S/tg-search.sh "кроссовки"                        # 20 hits, 200 dialogs scanned
 $S/tg-search.sh "giày 45" --limit 40 --dialogs 300 # wider scan
@@ -23,6 +23,7 @@ $S/tg-search.sh --dialogs-list --limit 40          # what this account can see
 $S/tg-search.sh --in @somechat "стрим" --mine      # inside one chat, only my messages
 $S/tg-search.sh --context @somechat 106157 --before 20 --after 20
 $S/tg-search.sh "nails" --raw                      # raw JSON for further processing
+$S/tg-search.sh "аренда" --until 2026-09-01T00:00:00  # upper date bound
 $S/tg-search.sh --login                            # authorize a new session
 ```
 
@@ -30,7 +31,8 @@ Several queries at once — always batch, never parallel calls (they fight over
 the session lock):
 
 ```bash
-$S/tg-search.sh --batch '[{"query":"кроссовки 45","limit":20},{"query":"sneakers 29cm","limit":20}]'
+$S/tg-search.sh --batch '[{"query":"кроссовки 45","limit":20},
+                          {"query":"sneakers 29cm","limit":40,"dialogs":300,"channel":"danang","since":"2026-08-01T00:00:00"}]'
 ```
 
 Output per hit: date, chat name, text (trimmed), `@author` and a `t.me` link.
@@ -74,8 +76,10 @@ its notification feed and links your identity to every group you watch.
 - **A plain chat search hides your own messages if you filter by sender wrong.**
   Use `--in <chat> --mine` — it passes `from_user='me'`, which is the only way
   to get your own outgoing messages back.
+- `--login` is interactive (it asks for the phone, then the code): run it in a real terminal, not
+  from inside an agent.
 - Two processes on one session file = `database is locked` and a wedged run.
-  The wrapper kills stale `tg_reader.py` processes first and takes an `flock`.
+  The wrapper kills any running `tg_reader.py` (including a healthy concurrent one) and takes an `flock`.
 - **Never run the same `.session` from two machines.** Telegram answers
   `AUTH_KEY_DUPLICATED` and logs the account out everywhere.
 

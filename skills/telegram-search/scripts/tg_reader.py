@@ -41,8 +41,14 @@ try:
 except ImportError:  # pragma: no cover
     sys.exit("telethon is missing: pip install -r requirements.txt")
 
-HOME = Path(os.environ.get("SEARCH_SKILLS_HOME") or (Path.home() / ".config" / "search-skills"))
-SESSION_DIR = Path(os.environ.get("TG_SESSION_DIR") or (HOME / "tg"))
+def env_path(name: str, default) -> Path:
+    """Empty/unset -> default; a leading ~ is expanded (shells do not expand it
+    inside a variable value, and .env values are read verbatim)."""
+    return Path(os.path.expanduser(os.environ.get(name) or str(default)))
+
+
+HOME = env_path("SEARCH_SKILLS_HOME", Path.home() / ".config" / "search-skills")
+SESSION_DIR = env_path("TG_SESSION_DIR", HOME / "tg")
 
 
 def load_dotenv(path: Path) -> None:
@@ -254,7 +260,10 @@ def main() -> None:
     p.add_argument("--after", type=int, default=10)
     p.add_argument("--batch-json", help='[{"query":"a","limit":20}, {"query":"b"}]')
     args = p.parse_args()
-    print(json.dumps(asyncio.run(run(args)), ensure_ascii=False, indent=1))
+    result = asyncio.run(run(args))
+    print(json.dumps(result, ensure_ascii=False, indent=1))
+    # Agents trust exit codes: a dead session must not look like "no results".
+    raise SystemExit(0 if result.get("success") else 1)
 
 
 if __name__ == "__main__":

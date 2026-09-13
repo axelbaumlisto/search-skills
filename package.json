@@ -5,7 +5,8 @@
   "license": "MIT",
   "private": false,
   "scripts": {
-    "shot": "node docs/shot.mjs"
+    "shot": "node docs/shot.mjs",
+    "test": "./tests/run.sh"
   },
   "dependencies": {
     "playwright": "^1.47.0"

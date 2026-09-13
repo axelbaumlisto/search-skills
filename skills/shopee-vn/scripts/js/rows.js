@@ -1,19 +1,16 @@
-// One row per cart item: climb from each Increase button to the container with the variant + price.
+// One row per cart item. Row discovery lives in _prelude.js (cartRows).
 (function () {
-  const ups = (el) => { let n = el; for (let i = 0; i < 12 && n; i++) { if (/Variations:/.test(n.innerText || '') && /₫/.test(n.innerText || '')) return n; n = n.parentElement; } return null; };
-  const seen = new Set(); const rows = [];
-  for (const b of document.querySelectorAll('button[aria-label="Increase"]')) {
-    const r = ups(b); if (!r || seen.has(r)) continue; seen.add(r);
+  return JSON.stringify(cartRows().map((r, i) => {
     const t = r.innerText.split('\n').map((x) => x.trim()).filter(Boolean);
     const qtyInput = r.querySelector('input[class*="quantity"], .shopee-input-quantity input');
-    rows.push({
-      i: rows.length,
+    const prices = t.filter((x) => /₫/.test(x));
+    return {
+      i,
       name: (t.find((x) => x.length > 25) || '').slice(0, 70),
       variant: t[t.indexOf('Variations:') + 1] || null,
-      price: t.filter((x) => /₫/.test(x))[0] || null,
-      total: t.filter((x) => /₫/.test(x)).pop() || null,
+      price: prices[0] || null,
+      total: prices[prices.length - 1] || null,
       qty: qtyInput ? qtyInput.value : null,
-    });
-  }
-  return JSON.stringify(rows);
+    };
+  }));
 })()

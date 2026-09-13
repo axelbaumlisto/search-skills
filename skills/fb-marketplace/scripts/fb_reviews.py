@@ -6,13 +6,13 @@ still ships them inside the initial HTML, so a single authenticated GET is
 enough.
 
 Usage:
-    fb_reviews.py gachkinhdanang
-    fb_reviews.py https://www.facebook.com/noithatbinhminhdanang
-    fb_reviews.py gachkinhdanang --json
+    fb_reviews.py <page-slug>
+    fb_reviews.py https://www.facebook.com/<page-slug>
+    fb_reviews.py <page-slug> --json
 
 Finding the slug is deliberately NOT done here: /search/pages renders its
 results with JS, so an HTTP fetch only ever returns unrelated people. Use
-`browse.sh https://www.facebook.com/search/pages?q=...` (real browser) or a
+a real browser on https://www.facebook.com/search/pages?q=... or a
 `site:facebook.com` web search, then pass the slug in.
 """
 from __future__ import annotations
@@ -25,7 +25,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from fb_local import FbLocalError, _opener, _read  # noqa: E402
+from fb_local import FbLocalError, _guard_response, _opener, _read, _throttle  # noqa: E402
 
 VN_HINT = re.compile(r"[àáâãèéêìíòóôõùúýăđĩũơư]", re.I)
 RECO = re.compile(r"^(?P<who>.{2,60}?) (?:recommends|doesn't recommend|đề xuất) ", re.I)
@@ -55,11 +55,14 @@ def fetch_reviews(target: str) -> dict:
     slug = _slug(target)
     op = _opener()
     url = f"https://mbasic.facebook.com/{slug}/reviews"
+    # Same account, same risk engine: obey the shared pacing budget and stop on a checkpoint.
+    _throttle()
     try:
         with op.open(url, timeout=40) as r:
-            raw = _read(r)
+            raw, final_url = _read(r), r.url
     except Exception as exc:  # noqa: BLE001
         raise FbLocalError(f"cannot open {url}: {exc}") from exc
+    _guard_response(raw, final_url)
 
     title = re.search(r"<title[^>]*>(.*?)</title>", raw)
     name = H.unescape(title.group(1)) if title else slug
@@ -75,7 +78,7 @@ def fetch_reviews(target: str) -> dict:
         if m:
             authors.append(m.group("who").strip())
             continue
-        if len(t) < 15 or not VN_HINT.search(t):
+        if len(t) < 15:
             continue
         # skip the page's own marketing blurb and menu strings
         if re.search(r"(cung cấp các dòng|Chuyên Phân Phối|ĐC:|Phone/Zalo|Help )", t):

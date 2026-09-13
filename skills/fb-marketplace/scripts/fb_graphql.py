@@ -12,7 +12,7 @@ import json
 
 CITY_COORDS = {
   # Vietnam
-  "danang":    (16.0544, 108.2022),   # protects fb-danang-iphone-smoke brief
+  "danang":    (16.0544, 108.2022),
   "hcmc":      (10.7769, 106.7009),
   "saigon":    (10.7769, 106.7009),
   "hanoi":     (21.0278, 105.8342),
@@ -30,30 +30,6 @@ CITY_COORDS = {
   "phangan":   (9.7319, 100.0136),
   "koh-phangan": (9.7319, 100.0136),
 }
-# Region substrings used to FILTER out FB's nationwide padding (case-insensitive).
-# FB tags listings by province/city text (reverse_geocode.city_page.display_name).
-REGION_HINTS = {
-  # Vietnam
-  "danang": ["Da Nang", "Đà Nẵng"],
-  "hcmc": ["Ho Chi Minh", "Hồ Chí Minh", "Saigon"],
-  "saigon": ["Ho Chi Minh", "Hồ Chí Minh", "Saigon"],
-  "hanoi": ["Hanoi", "Hà Nội"],
-  "nhatrang": ["Nha Trang", "Khanh Hoa", "Khánh Hòa"],
-  "hoian": ["Hoi An", "Hội An", "Quang Nam", "Quảng Nam"],
-  # Thailand
-  "bangkok": ["Bangkok", "Krung Thep", "Nonthaburi", "Samut Prakan"],
-  "samui": ["Surat Thani", "Ko Samui", "Samui", "Pha-ngan"],
-  "koh-samui": ["Surat Thani", "Ko Samui", "Samui", "Pha-ngan"],
-  "kosamui": ["Surat Thani", "Ko Samui", "Samui", "Pha-ngan"],
-  "pattaya": ["Pattaya", "Chon Buri", "Chonburi", "Bang Lamung"],
-  "phuket": ["Phuket"],
-  "chiangmai": ["Chiang Mai"],
-  "krabi": ["Krabi"],
-  "phangan": ["Pha-ngan", "Phangan", "Surat Thani"],
-  "koh-phangan": ["Pha-ngan", "Phangan", "Surat Thani"],
-}
-
-
 def _clean(s: str) -> str:
     """Decode FB's unicode escapes including surrogate pairs."""
     if not s:
@@ -156,9 +132,8 @@ def _listing_location(listing: dict):
     display = None
     if isinstance(reverse, dict):
         display = _nested(reverse, "city_page", "display_name") or reverse.get("city")
-        # Fixtures document the preferred coordinate shape: first-party
-        # reverse_geocode latitude/longitude when present, otherwise the
-        # listing.location latitude/longitude fallback below.
+        # Prefer the first-party reverse_geocode coordinates; fall back to
+        # listing.location below when they are absent.
         lat = _coerce_float(reverse.get("latitude"))
         lng = _coerce_float(reverse.get("longitude"))
     else:
@@ -200,22 +175,4 @@ def parse_edges(response_json: dict) -> list[dict]:
         listings.append(parsed)
     return listings
 
-
-def filter_region(listings, hints) -> list[dict]:
-    """Keep only listings whose FB location string matches a region hint."""
-    if not hints:
-        return []
-    normalized_hints = [str(hint).strip().lower() for hint in hints if str(hint).strip()]
-    if not normalized_hints:
-        return []
-
-    filtered = []
-    for listing in listings:
-        region = listing.get("location") if isinstance(listing, dict) else None
-        if not isinstance(region, str) or not region.strip():
-            continue
-        region_lower = region.lower()
-        if any(hint in region_lower for hint in normalized_hints):
-            filtered.append(listing)
-    return filtered
 

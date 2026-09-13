@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render fb_marketplace.py JSON (stdin) as compact human-readable lines."""
+"""Render fb_local.py JSON (stdin) as compact human-readable lines."""
 from __future__ import annotations
 
 import json
@@ -25,8 +25,8 @@ if listings is None:  # detail payload
 backend = d.get("backend", "?")
 geo = d.get("geo_verified")
 print(f"# query={d.get('query')!r} count={d.get('count')} backend={backend} geo_verified={geo}")
-if backend == "dom":
-    print("# warning: DOM backend — results follow the account location, not a city filter")
+if not geo:
+    print("# warning: no geo filter — results follow the account location, not a city")
 def price_label(raw: str | None) -> str:
     """Vietnamese sellers type '230' meaning 230 trieu, so the price field is
     routinely off by 3-6 orders of magnitude. Flag it instead of quoting it."""

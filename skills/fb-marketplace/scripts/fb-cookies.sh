@@ -8,13 +8,12 @@ set -uo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$HERE/../../.." && pwd)"
-CONF_DIR="${SEARCH_SKILLS_HOME:-$HOME/.config/search-skills}"
-STORE="${FB_COOKIES:-$CONF_DIR/facebook.cookies.txt}"
-PY="${PYTHON_BIN:-python3}"
+. "$ROOT/shared/common.sh"
+
+STORE="$(expand_tilde "${FB_COOKIES:-$CONF_DIR/facebook.cookies.txt}")"
 EXPORTER="${COOKIE_EXPORTER:-$ROOT/shared/chrome_cookies.py}"
-mkdir -p "$CONF_DIR"
 ACTION="${1:-status}"
-PROFILE="${2:-Default}"
+PROFILE="${2:-$CHROME_PROFILE}"
 
 if [ "$ACTION" = "refresh" ]; then
   "$PY" "$EXPORTER" facebook.com --profile "$PROFILE" --out "$STORE" || exit 1

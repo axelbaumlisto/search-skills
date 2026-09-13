@@ -8,7 +8,13 @@
  * screenshots stay reproducible and diffable.
  */
 import { readFileSync } from 'node:fs';
-import { chromium } from 'playwright';
+import { createRequire } from 'node:module';
+
+// Resolve playwright from the repo install, or from $SHOPEE_NODE_MODULES / $NODE_PATH
+// when it is shared with another checkout (the Shopee skill does the same).
+const require = createRequire(import.meta.url);
+const extra = process.env.SHOPEE_NODE_MODULES || process.env.NODE_PATH;
+const { chromium } = extra ? require(`${extra}/playwright`) : require('playwright');
 
 const [, , src, out, title = 'search-skills'] = process.argv;
 if (!src || !out) { console.error('usage: shot.mjs <transcript.txt> <out.png> [title]'); process.exit(2); }

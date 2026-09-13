@@ -105,6 +105,10 @@ def export(host: str, profile: str, out: Path | None) -> int:
     else:
         sys.stdout.write(text)
     print(f"names: {', '.join(names)}", file=sys.stderr)
+    if not names:
+        print(f"WARNING: no cookies matched {host} in profile {profile!r} — "
+              "log in there first, or pick another --profile", file=sys.stderr)
+        return 1
     if host.endswith("facebook.com") and not {"c_user", "xs"} <= set(names):
         print("WARNING: no c_user/xs — this profile is not logged into Facebook",
               file=sys.stderr)
