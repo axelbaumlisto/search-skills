@@ -8,8 +8,15 @@
 #   browse.sh https://example.com --chars 12000
 #   browse.sh https://example.com --shot /tmp/p.png   # PNG stays on remote-browser; path is printed
 set -uo pipefail
+# Хост задаётся снаружи: BROWSER_SSH_HOST или SKILLS_CONFIG (см. README).
+HOST="${BROWSER_SSH_HOST:-}"
+if [ -z "$HOST" ] && [ -n "${SKILLS_CONFIG:-}" ]; then
+  HOST=$(python3 -c "import json,os,sys;p=os.path.expanduser(sys.argv[1]);print(json.load(open(p)).get('remoteBrowser',{}).get('sshHost',''))" "$SKILLS_CONFIG" 2>/dev/null)
+fi
+HOST="${HOST:-remote-browser}"
 
-REMOTE=remote-browser
+
+REMOTE="$HOST"
 HELPER_LOCAL="$(dirname "$0")/_remote_browse.py"
 URL=""; MODE="text"; CHARS=4000; SHOT="-"; WAIT=120; SETTLE=6000
 while [ $# -gt 0 ]; do

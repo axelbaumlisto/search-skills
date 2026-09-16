@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run on remote-browser: attach to the logged-in Chrome over CDP, open a URL, dump text/HTML.
+"""Run on the remote host: attach to the logged-in Chrome over CDP, open a URL, dump text/HTML.
 
 argv: <url> <mode:text|html> <chars> <screenshot_path|-> [wait_ms]
 """
