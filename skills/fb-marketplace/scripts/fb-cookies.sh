@@ -6,22 +6,18 @@
 #   fb-cookies.sh refresh "Profile 1"
 set -uo pipefail
 
+STORE="$HOME/work/tg_agent/naked/.secrets/cookies/facebook.cookies.txt"
+PY="$HOME/work/tg_agent/naked/.venv/bin/python"
 HERE="$(cd "$(dirname "$0")" && pwd)"
-ROOT="$(cd "$HERE/../../.." && pwd)"
-. "$ROOT/shared/common.sh"
-
-STORE="$(expand_tilde "${FB_COOKIES:-$CONF_DIR/facebook.cookies.txt}")"
-EXPORTER="${COOKIE_EXPORTER:-$ROOT/shared/chrome_cookies.py}"
 ACTION="${1:-status}"
-PROFILE="${2:-$CHROME_PROFILE}"
+PROFILE="${2:-Default}"
 
 if [ "$ACTION" = "refresh" ]; then
-  "$PY" "$EXPORTER" facebook.com --profile "$PROFILE" --out "$STORE" || exit 1
+  "$PY" "$HERE/chrome_cookies.py" facebook.com --profile "$PROFILE" --out "$STORE" || exit 1
   # a fresh export invalidates the cached fb_dtsg of the previous session
   "$PY" - <<'EOF'
-import json, os, pathlib
-home = pathlib.Path(os.environ.get("SEARCH_SKILLS_HOME") or (pathlib.Path.home() / ".config" / "search-skills"))
-p = pathlib.Path(os.environ.get("FB_STATE") or (home / "fb_local_state.json"))
+import json, pathlib
+p = pathlib.Path.home() / ".naked" / "fb_local_state.json"
 if p.exists():
     st = json.loads(p.read_text()); st.pop("dtsg", None); p.write_text(json.dumps(st))
     print("cleared cached fb_dtsg")
@@ -36,9 +32,9 @@ printf 'store   : %s\nage     : %dh %dm\nsource  : %s\n' \
   "$(grep -m1 '^# exported' "$STORE" 2>/dev/null || echo 'unknown (not a local Chrome export)')"
 printf 'cookies : %s\n' "$(awk '!/^#/ && NF>=7 {printf "%s ", $6}' "$STORE")"
 
-HERE="$HERE" FB_STATE="${FB_STATE:-}" SEARCH_SKILLS_HOME="${SEARCH_SKILLS_HOME:-}" "$PY" - <<'EOF'
-import os, re, sys
-sys.path.insert(0, os.environ["HERE"])
+"$PY" - <<'EOF'
+import re, sys
+sys.path.insert(0, "$HOME/.pi/agent/skills/marketplace-search/scripts")
 import fb_local as m
 try:
     op = m._opener()

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render tg_reader.py JSON (stdin) as compact human-readable lines."""
+"""Render telegram_reader.py JSON (stdin) as compact human-readable lines."""
 import json
 import sys
 

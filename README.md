@@ -8,7 +8,9 @@ who sells it, and what do buyers complain about" and get a real answer.
 
 | Skill | What it answers | How |
 |---|---|---|
-| [shopee-vn](skills/shopee-vn/SKILL.md) | VN online prices, sold counts, variants, reviews, cart, order history | headless Chromium + the real Chrome for writes |
+| [shopee](skills/shopee/SKILL.md) | VN **and TH** prices, sold counts, variants, reviews, cart, order history | headless Chromium + the real Chrome for writes, or a remote browser over CDP |
+| [shopee-th](skills/shopee-th/SKILL.md) | the same for shopee.co.th, which blocks headless entirely | live DOM of a real browser |
+| [remote-browser](skills/remote-browser/SKILL.md) | drive a logged-in browser on another machine: batched actions, GraphQL capture, tab hygiene | one SSH tunnel to CDP + Playwright |
 | [fb-marketplace](skills/fb-marketplace/SKILL.md) | second-hand prices in a specific city, seller listings, Page reviews | plain HTTP replay of the Marketplace GraphQL query |
 | [telegram-search](skills/telegram-search/SKILL.md) | what people actually post in local chats: listings, contacts, rentals | Telethon over your joined chats |
 
@@ -170,3 +172,23 @@ is what the model needs to not repeat a mistake someone already paid for.
 ## License
 
 MIT — see [LICENSE](LICENSE).
+
+## Personal settings stay out of this repo
+
+Nothing here knows your hosts, cookie paths or which tabs belong to a live
+session of yours. Those live in one JSON file outside the repo:
+
+```bash
+export SKILLS_CONFIG=/path/to/skills.json
+```
+
+```json
+{
+  "remoteBrowser": { "sshHost": "my-server", "cdpRemotePort": 9222, "cdpLocalPort": 9224 },
+  "protectedDomains": ["shopee.vn", "accounts.google.com"],
+  "cookies": { "facebook": "~/.secrets/facebook.cookies.txt", "chromeProfile": "Default" }
+}
+```
+
+Without it the skills fall back to generic defaults — they still run, they
+just don't know anything about your machine.

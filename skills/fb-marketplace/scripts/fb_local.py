@@ -10,14 +10,9 @@ instead of an ssh round-trip plus a shared Chrome tab.
 Falls back is the caller's job: on any failure raise/print and let the wrapper
 use the browser path.
 
-Inputs (all overridable through the environment, see .env.example):
-  cookies  $FB_COOKIES   default ~/.config/search-skills/facebook.cookies.txt (netscape)
-  template $FB_TEMPLATE  default ~/.config/search-skills/fb_marketplace_graphql.json
-  state    $FB_STATE     default ~/.config/search-skills/fb_local_state.json
-
-The template is one captured Marketplace GraphQL request (doc_id + variables).
-It is account-specific and must never be committed — see templates/README.md
-for the 60-second capture procedure.
+Inputs:
+  cookies  ~/work/tg_agent/naked/.secrets/cookies/facebook.cookies.txt (netscape)
+  template ~/.naked/fb_marketplace_graphql.json  (doc_id + variables_template)
 """
 from __future__ import annotations
 
@@ -31,19 +26,10 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
-import os
-
-def _env_path(name: str, default: Path) -> Path:
-    """Empty or unset env var -> default; a leading ~ is expanded (shells do not
-    expand it inside a variable value)."""
-    return Path(os.path.expanduser(os.environ.get(name) or str(default)))
-
-
-HOME_DIR = _env_path("SEARCH_SKILLS_HOME", Path.home() / ".config" / "search-skills")
-COOKIES = _env_path("FB_COOKIES", HOME_DIR / "facebook.cookies.txt")
-TEMPLATE = _env_path("FB_TEMPLATE", HOME_DIR / "fb_marketplace_graphql.json")
-STATE = _env_path("FB_STATE", HOME_DIR / "fb_local_state.json")
-HOME_DIR.mkdir(parents=True, exist_ok=True)
+NAKED = Path.home() / "work" / "tg_agent" / "naked"
+COOKIES = NAKED / ".secrets" / "cookies" / "facebook.cookies.txt"
+TEMPLATE = Path.home() / ".naked" / "fb_marketplace_graphql.json"
+STATE = Path.home() / ".naked" / "fb_local_state.json"
 
 # Anti-ban budget. Facebook flags on request velocity, not on volume per se;
 # community-reported blocks start around 10-20 req/min from one address, so we
@@ -74,7 +60,6 @@ def _load_state() -> dict:
 def _save_state(st: dict) -> None:
     STATE.parent.mkdir(parents=True, exist_ok=True)
     STATE.write_text(json.dumps(st))
-    STATE.chmod(0o600)  # the cached fb_dtsg is session material
 
 
 def _throttle() -> None:
@@ -106,8 +91,9 @@ def _guard_response(text: str, final_url: str = "") -> None:
         if marker in blob:
             raise FbBlocked(
                 f"Facebook flagged this session (marker: {marker!r}). "
-                "Do NOT retry: open Facebook in the real browser on the same machine, "
-                "clear the checkpoint by hand, then leave the account idle for a while.")
+                "Do NOT retry: open Facebook in the real browser on remote-browser "
+                "(https://YOUR-HOST/vnc), clear the checkpoint by hand, then "
+                "leave the account idle for a while.")
 UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
       "(KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36")
 
@@ -136,8 +122,8 @@ def _read(response) -> str:
         raw = gzip.decompress(raw)
     return raw.decode("utf-8", "replace")
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-from fb_graphql import CITY_COORDS, merge_variables, parse_edges  # noqa: E402
+sys.path.insert(0, str(NAKED / "skills" / "facebook-marketplace" / "scripts"))
+from fb_marketplace import CITY_COORDS, merge_variables, parse_edges  # noqa: E402
 
 
 class FbLocalError(RuntimeError):
@@ -181,7 +167,7 @@ def fetch_tokens(op) -> tuple[str, str]:
     if "login" in final_url and "marketplace" not in final_url:
         raise FbLocalError("redirected to login — cookies expired")
     if '"USER_ID":"0"' in html:
-        raise FbLocalError("page says logged out — re-export cookies: fb-cookies.sh refresh")
+        raise FbLocalError("page says logged out — refresh cookies from remote-browser Chrome")
     dtsg = None
     for pattern in (r'"DTSGInitialData",\[\],\{"token":"([^"]+)"',
                     r'name="fb_dtsg" value="([^"]+)"',
@@ -237,7 +223,7 @@ def search(query: str, city: str | None, limit: int, lat=None, lng=None,
            radius_km=25, min_price=None, max_price=None, days=None,
            local_only=True) -> dict:
     if not TEMPLATE.exists():
-        raise FbLocalError(f"no GraphQL template at {TEMPLATE} — see templates/README.md")
+        raise FbLocalError(f"no GraphQL template at {TEMPLATE} (copy it from remote-browser)")
     cache = json.loads(TEMPLATE.read_text())
     if city:
         key = city.lower()
@@ -279,7 +265,7 @@ def main() -> int:
                          ensure_ascii=False))
         return 4
     except FbLocalError as exc:
-        print(json.dumps({"error": str(exc), "fallback": "re-capture the template or refresh cookies"},
+        print(json.dumps({"error": str(exc), "fallback": "use fb-search.sh (browser on remote-browser)"},
                          ensure_ascii=False))
         return 3
     print(json.dumps(out, ensure_ascii=False))
