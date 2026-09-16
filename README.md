@@ -25,7 +25,7 @@ classifieds is recommended for Telegram — see that skill's doc.)
 ![shopee](docs/images/shopee-search.png)
 
 ```bash
-S=./skills/shopee-vn/scripts/shopee.sh
+S=./skills/shopee/scripts/shopee.sh
 
 $S "giày nike nam" --limit 10 --sort sales        # search (headless)
 $S item <product-url> --desc                      # variants, per-model stock, real contents
@@ -47,7 +47,7 @@ Three things this skill exists to tell you, all learned the hard way:
 Cart *writes* cannot be automated at all from a scripted browser: Shopee's risk
 engine refuses them with `error 90309999`, including a replayed signed request.
 They run as JavaScript inside your real Chrome through a small AppleScript
-applet — build it with `./skills/shopee-vn/bridge/build_bridge.sh`.
+applet — build it with `./skills/shopee/bridge/build_bridge.sh`.
 
 ## Facebook Marketplace — geo-scoped second-hand prices
 
@@ -99,6 +99,35 @@ exists.
 
 ---
 
+## Remote browser — one logged-in browser, driven from anywhere
+
+Some sites cannot be read from a script at all: Facebook groups need a real
+session, lazy feeds need a visible tab, and a *background* tab in Chrome makes
+no network requests at all — so nothing ever loads. This skill drives a
+persistent, already-logged-in Chrome on another machine over CDP.
+
+```bash
+skills/remote-browser/scripts/tunnel.sh          # one SSH tunnel in tmux, reconnects itself
+node skills/remote-browser/scripts/rbrowser.js '[
+  {"do":"goto","url":"https://example.com","wait":"h1"},
+  {"do":"list","sel":"a","fields":["text","href"],"as":"links"}
+]'
+```
+
+A whole interaction is one call: `goto`, `wait`, `click` (by selector *or* by
+visible text), `type` (native setter + bubbling events, for controlled React
+inputs), `scroll` (waits for the document to grow, not for a timer), `eval`,
+`text`, `html`, `attr`, `list`, `gql` + `gqlDump` (capture `/api/graphql`
+responses), `shot`, `cookies`. The reply is JSON with every step's duration, so
+a slow step is visible instead of guessed.
+
+Tab hygiene is part of the skill, not an afterthought: its own tab is reused
+(marked via `addInitScript`, so the mark survives navigation) and parked on
+`about:blank` afterwards; `--tabs` reports the state; `--cleanup` closes only
+its own leftovers and never touches domains you listed as holding live
+sessions. Left unattended it once piled up 24 pages, 17 of them abandoned
+login screens.
+
 ## Install
 
 Requires Node 18+ and Python 3.10+.
@@ -113,6 +142,10 @@ mkdir -p ~/.config/search-skills
 cp .env.example ~/.config/search-skills/.env && chmod 600 ~/.config/search-skills/.env
 ```
 
+Personal settings — ssh host of the remote browser, which domains hold your
+live sessions, where the cookie export lives — go into one JSON file outside
+this repo and are picked up via `SKILLS_CONFIG` (see the section at the end).
+
 Note: only the Telegram scripts read that `.env`. Shopee and Facebook variables
 must be exported in your shell (they all have working defaults).
 
@@ -120,9 +153,9 @@ Then per skill, once:
 
 ```bash
 # Shopee: export the session from your local Chrome
-./skills/shopee-vn/scripts/shopee.sh --refresh-cookies && ./skills/shopee-vn/scripts/shopee.sh --check
+./skills/shopee/scripts/shopee.sh --refresh-cookies && ./skills/shopee/scripts/shopee.sh --check
 # Shopee cart writes only: build the AppleScript bridge (macOS)
-./skills/shopee-vn/bridge/build_bridge.sh
+./skills/shopee/bridge/build_bridge.sh
 
 # Facebook: export cookies, then capture the GraphQL template once
 ./skills/fb-marketplace/scripts/fb-cookies.sh refresh
@@ -144,6 +177,9 @@ your first push.
 ```
 skills/<name>/SKILL.md      agent-facing doc: commands + hard-won rules
 skills/<name>/scripts/      the actual CLI, one concern per file
+skills/shopee/scripts/browser.cjs   picks the backend: local bridge or remote CDP
+skills/remote-browser/scripts/rbrowser.js  batched browser actions -> JSON
+skills/remote-browser/scripts/tunnel.sh    the tmux SSH tunnel both of them use
 shared/chrome_cookies.py    export cookies for a host from the local Chrome (macOS Keychain)
 examples/*.json             real output of each skill, trimmed and redacted
 docs/shot.mjs               render a terminal transcript into a README screenshot
