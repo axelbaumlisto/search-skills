@@ -109,7 +109,7 @@ them. TH-specific notes:
 
 ## Session / cookies
 
-- cookies: `~/work/tg_agent/naked/.secrets/cookies/shopee_th.cookies.txt` (mode 600, Netscape)
+- cookies: `$SHOPEE_COOKIE_DIR/shopee_th.cookies.txt` (default `~/.config/shopee-search/cookies`, mode 600, Netscape)
 - **Keychain over SSH/tmux**: `launchctl managername` reports `Background`, so `security`
   fails with *User interaction is not allowed* and the cookie export dies. `--refresh-cookies`
   now detects this and relays the export through `ChromeBridge.app`, which `open` starts

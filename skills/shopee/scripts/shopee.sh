@@ -24,18 +24,21 @@
 # NB: the search price is the CHEAPEST variant's price, not the one you need.
 set -uo pipefail
 
+HERE="$(cd "$(dirname "$0")" && pwd)"
+# Где лежат сессии и окружение — дело установки, не скилла.
+COOKIE_DIR="${SHOPEE_COOKIE_DIR:-$HOME/.config/shopee-search/cookies}"
+
 REGION="$(printf '%s' "${SHOPEE_REGION:-vn}" | tr '[:upper:]' '[:lower:]')"
 case "$REGION" in
-  vn) HOST="shopee.vn";    LANG_H="vi"; COOKIES="$HOME/work/tg_agent/naked/.secrets/cookies/shopee.cookies.txt";;
-  th) HOST="shopee.co.th"; LANG_H="th"; COOKIES="$HOME/work/tg_agent/naked/.secrets/cookies/shopee_th.cookies.txt";;
+  vn) HOST="shopee.vn";    LANG_H="vi"; COOKIES="$COOKIE_DIR/shopee.cookies.txt";;
+  th) HOST="shopee.co.th"; LANG_H="th"; COOKIES="$COOKIE_DIR/shopee_th.cookies.txt";;
   *)  echo "unknown SHOPEE_REGION=$REGION (vn|th)" >&2; exit 2;;
 esac
 export SHOPEE_REGION="$REGION"
 
-NODE_MODULES="$HOME/work/naked/node_modules"
-PY="$HOME/work/tg_agent/naked/.venv/bin/python"
-EXPORTER="$HOME/.pi/agent/skills/marketplace-search/scripts/chrome_cookies.py"
-HERE="$(cd "$(dirname "$0")" && pwd)"
+NODE_MODULES="${SHOPEE_NODE_MODULES:-$HERE/../node_modules}"
+PY="${SHOPEE_PYTHON:-python3}"
+EXPORTER="${SHOPEE_COOKIE_EXPORTER:-$HERE/chrome_cookies.py}"
 UA="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36"
 
 # Keychain reads need a GUI session. Over SSH/tmux (`launchctl managername` = Background)

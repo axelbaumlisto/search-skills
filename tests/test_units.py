@@ -10,7 +10,12 @@ sys.path.insert(0, str(ROOT / "skills" / "fb-marketplace" / "scripts"))
 
 import fb_local as g  # noqa: E402   # модуль переименован из fb_graphql
 
+# Проверяемые функции приходят из fb_marketplace.py, который ставится отдельно.
+# Без него тесты чистых функций проверять нечего — пропускаем, а не падаем.
+HAVE_QUERY_LAYER = bool(getattr(g, "CITY_COORDS", None))
 
+
+@unittest.skipUnless(HAVE_QUERY_LAYER, "fb_marketplace.py не установлен")
 class MergeVariables(unittest.TestCase):
     def base(self):
         return {"count": 24, "cursor": "stale-page-7",
@@ -47,6 +52,7 @@ class MergeVariables(unittest.TestCase):
         self.assertTrue(bp["commerce_enable_shipping"])
 
 
+@unittest.skipUnless(HAVE_QUERY_LAYER, "fb_marketplace.py не установлен")
 class ParseEdges(unittest.TestCase):
     def payload(self, listing):
         return {"data": {"marketplace_search": {"feed_units": {"edges": [{"node": {"listing": listing}}]}}}}

@@ -9,12 +9,14 @@
 #   tg-search.sh "nails" --raw                     # full JSON instead of table
 set -uo pipefail
 
-NAKED="$HOME/work/tg_agent/naked"
-PY="$NAKED/.venv/bin/python"
-TR="$NAKED/skills/telegram-reader/scripts/telegram_reader.py"
+# Каталог проекта с Telethon-сессией — задаётся снаружи.
+TG_HOME="${TG_HOME:-$HOME/.config/telegram-search}"
+PY="$TG_HOME/.venv/bin/python"
+TR="$TG_HOME/skills/telegram-reader/scripts/telegram_reader.py"
 
-[ -x "$PY" ] || { echo "no venv at $PY — see $NAKED/skills/RUNBOOK-local.md" >&2; exit 2; }
-[ -f "$HOME/work/tg_agent/.env" ] || { echo "missing ~/work/tg_agent/.env (the only path the reader loads)" >&2; exit 2; }
+[ -x "$PY" ] || { echo "no venv at $PY — see $TG_HOME/skills/RUNBOOK-local.md" >&2; exit 2; }
+TG_ENV="${TG_ENV:-$TG_HOME/.env}"
+[ -f "$TG_ENV" ] || { echo "missing $TG_ENV — set TG_ENV or TG_HOME" >&2; exit 2; }
 
 QUERY=""; ACCOUNT="research"; LIMIT=20; DIALOGS=200; RAW=0; BATCH=""; MODE="search"
 CHANNEL=""; DATE_FROM=""; DATE_TO=""

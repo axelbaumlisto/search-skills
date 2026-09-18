@@ -7,7 +7,9 @@
 const os = require('os');
 const path = require('path');
 
-const COOKIE_DIR = path.join(os.homedir(), 'work/tg_agent/naked/.secrets/cookies');
+// Каталог сессий — дело установки, не скилла: SHOPEE_COOKIE_DIR переопределяет.
+const COOKIE_DIR = process.env.SHOPEE_COOKIE_DIR
+  || path.join(os.homedir(), '.config/shopee-search/cookies');
 
 const REGIONS = {
   vn: {

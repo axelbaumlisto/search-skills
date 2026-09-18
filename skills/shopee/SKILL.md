@@ -240,14 +240,14 @@ the default profile, so CDP on the real profile is not an option either. Hence t
 
 ## Files
 
-- cookies: `~/work/tg_agent/naked/.secrets/cookies/shopee.cookies.txt` (mode 600, Netscape);
+- cookies: `$SHOPEE_COOKIE_DIR/shopee.cookies.txt` (default `~/.config/shopee-search/cookies`, mode 600, Netscape);
   TH: `shopee_th.cookies.txt`
 - exporter: `~/.pi/agent/skills/marketplace-search/scripts/chrome_cookies.py shopee.vn --profile Default`
 - **Keychain needs a GUI session.** Over SSH/tmux `launchctl managername` = `Background`, the
   Chrome Safe Storage read fails with *User interaction is not allowed* and the export dies.
   `refresh()` falls back to running the exporter through `ChromeBridge.app` (`open` puts it in
   the Aqua session). Reuse that relay for any other GUI-gated shell command.
-- playwright comes from `~/work/naked/node_modules` via `NODE_PATH`
+- playwright comes from `$SHOPEE_NODE_MODULES` via `NODE_PATH` (default: `node_modules` next to the skill)
 - debug: `SHOPEE_DEBUG=1` prints the built URL and accepted/skipped XHRs
 
 ## Подложка браузера: bridge или remote-browser

@@ -12,7 +12,7 @@ the "Chrome Safe Storage" Keychain entry (PBKDF2-HMAC-SHA1, salt=b"saltysalt",
 
 Usage:
     chrome_cookies.py facebook.com
-    chrome_cookies.py facebook.com --out ~/work/tg_agent/naked/.secrets/cookies/facebook.cookies.txt
+    chrome_cookies.py facebook.com --out ~/.config/fb-marketplace/facebook.cookies.txt
     chrome_cookies.py facebook.com --profile "Profile 1"
 """
 from __future__ import annotations

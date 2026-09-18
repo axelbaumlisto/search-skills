@@ -242,3 +242,24 @@ skills/lazada/scripts/lazada.sh search "portable monitor touch"
 History is read from the page's own Ultron endpoint, so a long history takes under
 ten requests instead of one click per page. Catalogue search does not depend on the
 browser window being visible — unlike Shopee TH search, which does.
+
+## Installation-specific paths
+
+Nothing machine-specific is baked into the skills. Sessions, interpreters and helper
+scripts are located through environment variables, each with a sane default:
+
+| variable | default | used by |
+|---|---|---|
+| `SHOPEE_COOKIE_DIR` | `~/.config/shopee-search/cookies` | shopee, shopee-th |
+| `SHOPEE_PYTHON` | `python3` | shopee cookie export |
+| `FB_COOKIES` | `~/.config/fb-marketplace/facebook.cookies.txt` | fb-marketplace |
+| `FB_TEMPLATE`, `FB_STATE` | under `~/.config/fb-marketplace/` | fb-marketplace HTTP path |
+| `FB_BROWSER_SCRIPTS` | `~/.config/fb-marketplace/browser-scripts` | fb-marketplace query layer |
+| `FB_REMOTE_DIR`, `FB_REMOTE_SCRIPT` | `.`, `fb_marketplace.py` | fb-marketplace browser fallback |
+| `REMOTE_NODE_MODULES` | — | remote-browser |
+| `SHOPEE_NODE_MODULES` | `node_modules` next to the skill | shopee headless search |
+| `TG_HOME` | `~/.config/telegram-search` | telegram-search |
+| `TG_ENV` | `$TG_HOME/.env` | telegram-search credentials file |
+
+`fb_marketplace.py` (GraphQL template, city table, edge parsing) is installed separately;
+without it the fb-marketplace HTTP path exits with a clear message and its unit tests skip.

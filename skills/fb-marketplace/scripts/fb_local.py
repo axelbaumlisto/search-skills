@@ -11,8 +11,8 @@ Falls back is the caller's job: on any failure raise/print and let the wrapper
 use the browser path.
 
 Inputs:
-  cookies  ~/work/tg_agent/naked/.secrets/cookies/facebook.cookies.txt (netscape)
-  template ~/.naked/fb_marketplace_graphql.json  (doc_id + variables_template)
+  cookies  $FB_COOKIES, default ~/.config/fb-marketplace/facebook.cookies.txt (netscape)
+  template $FB_TEMPLATE, default ~/.config/fb-marketplace/fb_marketplace_graphql.json
 """
 from __future__ import annotations
 
@@ -26,10 +26,16 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
-NAKED = Path.home() / "work" / "tg_agent" / "naked"
-COOKIES = NAKED / ".secrets" / "cookies" / "facebook.cookies.txt"
-TEMPLATE = Path.home() / ".naked" / "fb_marketplace_graphql.json"
-STATE = Path.home() / ".naked" / "fb_local_state.json"
+# Куда положены сессия и состояние — дело установки, а не скилла: пути берутся
+# из окружения, значения по умолчанию лежат под ~/.config/fb-marketplace.
+import os
+
+HOME_DIR = Path(os.environ.get("FB_HOME", Path.home() / ".config" / "fb-marketplace"))
+COOKIES = Path(os.environ.get("FB_COOKIES", HOME_DIR / "facebook.cookies.txt"))
+TEMPLATE = Path(os.environ.get("FB_TEMPLATE", HOME_DIR / "fb_marketplace_graphql.json"))
+STATE = Path(os.environ.get("FB_STATE", HOME_DIR / "fb_local_state.json"))
+# Каталог со скриптами браузерного пути; нужен только для запасного варианта.
+BROWSER_SCRIPTS = Path(os.environ.get("FB_BROWSER_SCRIPTS", HOME_DIR / "browser-scripts"))
 
 # Anti-ban budget. Facebook flags on request velocity, not on volume per se;
 # community-reported blocks start around 10-20 req/min from one address, so we
@@ -122,8 +128,24 @@ def _read(response) -> str:
         raw = gzip.decompress(raw)
     return raw.decode("utf-8", "replace")
 
-sys.path.insert(0, str(NAKED / "skills" / "facebook-marketplace" / "scripts"))
-from fb_marketplace import CITY_COORDS, merge_variables, parse_edges  # noqa: E402
+# Запросный слой (шаблон GraphQL, города, разбор рёбер) живёт рядом со
+# скриптами браузерного пути и ставится отдельно. Без него HTTP-путь не
+# работает, но модуль обязан импортироваться: иначе падает всё, включая тесты
+# чистых функций. Раньше путь был вшит в приватный каталог, и снаружи этот
+# импорт валился с ModuleNotFoundError.
+sys.path.insert(0, str(BROWSER_SCRIPTS))
+try:
+    from fb_marketplace import CITY_COORDS, merge_variables, parse_edges  # noqa: E402
+except ModuleNotFoundError:  # pragma: no cover - зависит от установки
+    CITY_COORDS = {}
+
+    def _missing(*_a, **_k):
+        raise SystemExit(
+            "fb_marketplace.py не найден. Положи скрипты браузерного пути в "
+            f"{BROWSER_SCRIPTS} или задай FB_BROWSER_SCRIPTS."
+        )
+
+    merge_variables = parse_edges = _missing
 
 
 class FbLocalError(RuntimeError):

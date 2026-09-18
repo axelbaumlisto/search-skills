@@ -28,7 +28,7 @@ echo "== unit tests"
 echo "== no secrets / no machine paths in tracked files"
 # Сам этот файл содержит искомый шаблон, поэтому исключён — иначе тест
 # всегда падал на собственной строке.
-if git -C "$ROOT" ls-files -z -- ':!tests/run.sh' | xargs -0 grep -nE '/Users/|/home/[a-z]|c_user=|xs=[A-Za-z0-9]|api_hash *= *[0-9a-f]{32}' ; then
+if git -C "$ROOT" ls-files -z -- ':!tests/run.sh' | xargs -0 grep -nE '/Users/|/home/[a-z]|tg_agent|naked/|c_user=|xs=[A-Za-z0-9]|api_hash *= *[0-9a-f]{32}' ; then
   echo "  FAIL: leaked path or credential above"; fail=1
 fi
 

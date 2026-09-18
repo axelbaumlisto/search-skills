@@ -6,8 +6,8 @@
 #   fb-cookies.sh refresh "Profile 1"
 set -uo pipefail
 
-STORE="$HOME/work/tg_agent/naked/.secrets/cookies/facebook.cookies.txt"
-PY="$HOME/work/tg_agent/naked/.venv/bin/python"
+STORE="${FB_COOKIES:-$HOME/.config/fb-marketplace/facebook.cookies.txt}"
+PY="${FB_PYTHON:-python3}"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 ACTION="${1:-status}"
 PROFILE="${2:-Default}"

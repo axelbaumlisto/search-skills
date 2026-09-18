@@ -32,7 +32,7 @@ for piping. The final URL reveals redirects to login/challenge pages.
    pool**, so it fails fast; skip until a key is added.
 3. This skill — real browser with cookies, solves most Cloudflare interstitials
    just by being a real browser.
-4. `turnstile-solve` (`~/work/tg_agent/naked/scripts/turnstile_solve.py`) — when
+4. `turnstile-solve` (a Turnstile helper on the remote host) — when
    a Turnstile widget still blocks a form; capsolver keys are live, the 2captcha
    key is dead.
 
@@ -41,9 +41,9 @@ for piping. The final URL reveals redirects to login/challenge pages.
 For clicking, typing, scrolling and revealing phone numbers, use the naked
 playbooks instead of this thin wrapper — they carry per-site recipes:
 
-- `~/work/tg_agent/naked/skills/web-browser-playbook/SKILL.md` — anti-bot,
+- the anti-bot playbook that ships with the remote browser host — anti-bot,
   click-to-reveal, per-site selectors for VN real-estate aggregators
-- `~/work/tg_agent/naked/skills/playwright-control/SKILL.md` — calibrating
+- the Playwright control notes on that host — calibrating
   selectors for scraping briefs
 
 ## Shared-browser etiquette
@@ -69,7 +69,7 @@ shop data).
 действий JSON-ом за один запуск, ожидание по событиям, а не по таймеру.
 
 ```bash
-export NODE_PATH=$HOME/work/naked/node_modules
+export NODE_PATH="$REMOTE_NODE_MODULES"   # где на хосте лежит node_modules
 node scripts/rbrowser.js '[
   {"do":"goto","url":"https://example.com","wait":"h1"},
   {"do":"list","sel":"a","fields":["text","href"],"as":"links"}

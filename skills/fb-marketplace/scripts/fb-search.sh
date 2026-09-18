@@ -10,7 +10,7 @@
 set -uo pipefail
 
 REMOTE=remote-browser
-FB='naked/skills/facebook-marketplace/scripts/fb_marketplace.py'
+FB="${FB_REMOTE_SCRIPT:-fb_marketplace.py}"   # путь на удалённом хосте
 TAG="fb-$$"
 OUT="/tmp/$TAG.out"; ERR="/tmp/$TAG.err"
 CITIES="bangkok pattaya phuket samui phangan chiangmai krabi danang hcmc hanoi nhatrang hoian"

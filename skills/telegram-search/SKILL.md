@@ -1,7 +1,7 @@
 ---
 name: telegram-search
 description: Live search across joined Telegram chats and channels (classifieds, city chats, expat groups in Vietnam/Thailand) plus personal DMs. Use when the user wants to find listings, prices, contacts, rentals, second-hand goods, services or discussions inside Telegram — "поищи в телеге", "объявления в телеграме", "что пишут в чатах про X", "найди продавца", "telegram search". Also lists joined channels and downloads files/images from a chat.
-compatibility: macOS/Linux with ~/work/tg_agent/naked checkout, uv venv and an authorized Telethon session.
+compatibility: macOS/Linux with $TG_HOME pointing at a checkout that has a uv venv and an authorized Telethon session.
 ---
 
 # Telegram search
@@ -57,7 +57,7 @@ Dead auth key does not raise — the process just hangs with empty stdout. Re-au
 needs the login code from the operator:
 
 ```bash
-cd ~/work/tg_agent/naked
+cd "$TG_HOME"
 nohup .venv/bin/python skills/telegram-reader/scripts/reauth.py \
       --account research --session research_new > /tmp/tg_auth.log 2>&1 &
 # ask the user for the code that arrived INSIDE Telegram, then:
@@ -73,8 +73,8 @@ cp research_new.session research_session.session
 Beyond search the underlying script does `join_channels`, `search_channels`,
 `download_files`, `download_images`, `export_messages`, `extract_links`,
 `forward_messages`. Reference:
-`~/work/tg_agent/naked/skills/telegram-reader/SKILL.md`,
-runbook `~/work/tg_agent/naked/skills/telegram-reader/README.md`.
+the telegram-reader docs in that checkout,
+plus its runbook.
 
 Never use the same session simultaneously here and on `remote-browser` —
 `AUTH_KEY_DUPLICATED` logs the account out everywhere.

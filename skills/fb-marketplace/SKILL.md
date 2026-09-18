@@ -33,7 +33,7 @@ $S/fb-search.sh "macbook" bangkok --raw                    # raw JSON
 ### Page reviews (no browser)
 
 ```bash
-PY=~/work/tg_agent/naked/.venv/bin/python
+PY="${FB_PYTHON:-python3}"
 $PY $S/fb_reviews.py gachkinhdanang                # slug or full URL
 $PY $S/fb_reviews.py https://www.facebook.com/noithatbinhminhdanang --json
 ```
@@ -80,7 +80,7 @@ files, and kills the remote process on timeout. Raise the budget with
 |---|---|
 | Whose account | requests run under the **owner's personal Facebook account** — there is no anonymous mode |
 | Where it runs | on the machine whose cookies are installed; cookies and IP must belong together |
-| Cookie store | `~/work/tg_agent/naked/.secrets/cookies/facebook.cookies.txt`, mode 600, kept **locally**, exported from the local Chrome |
+| Cookie store | `$FB_COOKIES` (default `~/.config/fb-marketplace/facebook.cookies.txt`), mode 600, kept **locally**, exported from the local Chrome |
 | Cookie lifetime | dies on logout/password change/Meta invalidation — no auto-refresh, re-run `fb-cookies.sh refresh` by hand |
 | Pace | ≥4 s + jitter between requests, **40 requests/hour**, enforced in code |
 | Volume | fine for "find me N listings"; not a bulk scraper and must not become one |
@@ -110,7 +110,7 @@ purpose. Guard rails baked into `fb_local.py`:
 | Guard | Value | Why |
 |-------|-------|-----|
 | min interval + jitter | 4 s + up to 3 s random | community-reported blocks start near 10-20 req/min from one address |
-| hourly budget | 40 requests, persisted in `~/.naked/fb_local_state.json` | refuses to continue instead of drifting into a block |
+| hourly budget | 40 requests, persisted in `$FB_STATE` (default `~/.config/fb-marketplace/fb_local_state.json`) | refuses to continue instead of drifting into a block |
 | `fb_dtsg` cache | 20 min | one search = one GraphQL call instead of also pulling a 2 MB page |
 | flag detection | `/checkpoint/`, `1357004`, `1390008`, "We limit how often", "You Can't Use This Feature Right Now" | exits **4** and tells the caller to stop |
 
@@ -130,9 +130,9 @@ sent from this machine — the same box and residential IP the human actually
 browses Facebook from.
 
 ```bash
-PY=~/work/tg_agent/naked/.venv/bin/python
+PY="${FB_PYTHON:-python3}"
 $PY scripts/chrome_cookies.py facebook.com \
-   --out ~/work/tg_agent/naked/.secrets/cookies/facebook.cookies.txt
+   --out ~/.config/fb-marketplace/facebook.cookies.txt
 ```
 
 `chrome_cookies.py` decrypts the macOS Chrome cookie DB (AES-128-CBC, key from
@@ -156,12 +156,12 @@ The full client-hint set (`sec-ch-ua`, `sec-ch-ua-platform`, `Sec-Fetch-*`,
 too.
 
 The GraphQL template (`doc_id` + variables) is cached at
-`~/.naked/fb_marketplace_graphql.json`. If Meta ships a new client build the
+`$FB_TEMPLATE` (default `~/.config/fb-marketplace/fb_marketplace_graphql.json`). If Meta ships a new client build the
 `doc_id` rotates and the fast path starts returning GraphQL errors — re-copy the
 file from `remote-browser`, where the browser harvests it automatically:
 
 ```bash
-scp remote-browser:.naked/fb_marketplace_graphql.json ~/.naked/fb_marketplace_graphql.json
+scp remote-browser:fb_marketplace_graphql.json ~/.config/fb-marketplace/fb_marketplace_graphql.json
 ```
 
 ## When it breaks
@@ -175,8 +175,8 @@ scp remote-browser:.naked/fb_marketplace_graphql.json ~/.naked/fb_marketplace_gr
 | unknown city | use `--lat/--lng`, or add the preset in the underlying skill |
 
 Underlying server-side skill (also has group search):
-`remote-browser:~/work/tg_agent/naked/skills/facebook-marketplace/scripts/fb_marketplace.py`.
-Local mirror of the docs: `~/work/tg_agent/naked/skills/facebook-marketplace/SKILL.md`.
+the browser-path script on the remote host, `$FB_BROWSER_SCRIPTS/fb_marketplace.py`.
+
 
 For classifieds inside Telegram use `telegram-search`; for the physical shop
 behind a listing use `google-places`; for other blocked sites use
