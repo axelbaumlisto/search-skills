@@ -287,3 +287,33 @@ example.com и на группе Facebook он работает тем же вы
 - **Вариант товара необязателен.** У односортных товаров (CeraVe) блока
   `Variation:` нет, и обязательный шаблон выбрасывал весь заказ как пустой —
   из пяти заказов возвращалось четыре.
+
+## The Chrome window must be visible (2026-09-18)
+
+When the Chrome window is covered by other windows, macOS marks the tab occluded.
+The page then stops loading lazy data and React never hydrates — nothing reacts to
+clicks. Checked in order, none of these help: redefining `document.visibilityState`
+to `visible`, replacing `requestAnimationFrame` with a timer, hooking `fetch`/`XHR`.
+
+| command | in a covered window |
+|---|---|
+| `search` (TH, live DOM) | three promo cards only, no organic results |
+| `orders` without a query | first screen only; scrolling loads nothing |
+| `orders --query` | works — server-side search over the whole history |
+| `order <id>` | works |
+| `cart` | reads fine |
+
+The old error message blamed Shopee's anti-bot. That was wrong: the page's own request
+returns 200 with full data, visible in `performance.getEntriesByType('resource')[].responseStatus`.
+Replaying that URL by hand returns 403/90309999 only because it lacks the anti-bot
+signature the page computes itself. The message now points at the window.
+
+## The purchase list has no pagination (2026-09-18)
+
+`?page=N` is ignored: both VN and TH return the same first screen of five orders for
+any page. The previous `--pages` loop multiplied duplicates — 20 pages reported
+"100 orders" that were the same five. Dedupe existed only in the `--query` branch,
+so the inflation went unnoticed.
+
+`orders` now loads the list by scrolling and accumulating, and reports `visible`
+plus a `note`. For the full history use `orders --query <word>`.

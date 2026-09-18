@@ -65,11 +65,35 @@ function parseCard(c) {
  *  Needed for regions where the search XHR is refused to any automated browser. */
 async function liveSearch(keyword, sort, min, max, limit, page0) {
   await go(searchUrl(keyword, sort, min, max, page0), 15000);
-  await autoScroll({ steps: 10, everyMs: 700, px: 1600 });
-  const cards = await jsonFile('search_read');
-  if (!Array.isArray(cards) || !cards.length) throw new Error('no cards rendered (captcha in the live tab?)');
+  /* Сетка виртуализована: контейнеры [data-sqe=item] существуют сразу (60 шт.),
+     но содержимое появляется только у видимых, а у ушедших из вида снова пустеет.
+     Одно чтение после прокрутки видело только три рекламные карточки вверху, и тайский
+     поиск отдавал пустоту. Поэтому читаем на каждом шаге и накапливаем. */
+  const byId = new Map();
+  for (let step = 0; step < 12; step++) {
+    const batch = await jsonFile('search_read');
+    if (Array.isArray(batch)) for (const c of batch) byId.set(`${c.shopid}.${c.itemid}`, c);
+    if (byId.size >= limit * 3) break;
+    await runJS(`scrollBy(0, 1500); 1`);
+    await sleep(800);
+  }
+  const cards = [...byId.values()];
+  if (!cards.length) throw new Error('no cards rendered (captcha in the live tab?)');
   // the first rows are a paid promo strip whose products often ignore the query
   const rows = flag('ads') ? cards : cards.filter((c) => c.organic);
+  /* Реклама есть, а органики нет — значит сетка ждёт данных, которые ей не дали.
+     Тихой пустоты вместо ошибки быть не должно: спрашиваем у самой страницы, чем ответил
+     её же запрос поиска, и передаём код наружу. 403/90309999 — анти-бот Шопи,
+     вылезает после очереди запросов подряд и проходит сам через несколько минут. */
+  if (!rows.length && cards.length) {
+    const why = await searchApiStatus();
+    throw new Error(
+      `выдана только реклама (${cards.length} карт.), органики нет.\n`
+      + `Запрос поиска самой страницы: ${why}.\n`
+      + 'Причина не в блокировке, а в окне Chrome: когда оно перекрыто другими\n'
+      + 'окнами, macOS считает его occluded, и Сетка результатов не строится вовсе.\n'
+      + 'Покажи окно Chrome на экране и повтори запрос.');
+  }
   const items = rows.map(parseCard).filter((i) => i.name).slice(0, limit);
   return out({ region: R.code, currency: R.currency, source: 'live-dom', keyword, sort, page: page0, returned: items.length, items });
 }
@@ -273,7 +297,6 @@ async function reviews() {
  *  Reads My Purchases from the live Chrome, walks the pager and filters locally.
  *  Shopee's own purchase search box is React-driven; the ?page= URL is the reliable way. */
 async function orders() {
-  const pages = Number(val('pages', flag('query') || val('query') ? 5 : 1));
   const type = val('type', 'all');
   const q = (val('query') || '').toLowerCase();
   // With a query, use Shopee's own search box: it covers the whole history server-side,
@@ -283,17 +306,45 @@ async function orders() {
     const typed = await runFile('orders_search', { Q: JSON.stringify(val('query')) });
     if (typed === 'no-input') throw new Error('purchase search box not found');
     await sleep(6000);
+    await waitOrders();
     const hit = dedupe(parseOrders(await jsonFile('orders_read')));
     return out({ region: R.code, query: val('query'), source: 'purchase-search', orders: hit.length, list: hit });
   }
+  /* Постраничности у списка покупок НЕТ: ?page=N Шопи игнорирует — и VN, и TH
+     на любой странице отдают один и тот же первый экран из 5 заказов. Прежний
+     цикл по --pages множил повторы: 20 страниц давали «100 заказов», которые
+     были теми же пятью. Список подгружается бесконечной п��окруткой, поэтому
+     листаем вниз и накапливаем, пока приходят новые.
+
+     Прокрутка работает только в видимом окне: в перекрытом macOS помечает
+     вкладку occluded, догрузка не срабатывает, и виден лишь первый экран.
+     Поэтому в ответе есть visible и note, а за полной историей — --query:
+     он идёт через серверный поиск Шопи и видит все заказы. */
+  await go(`${R.base}/user/purchase/?type=${type}`, 13000);
+  const painted = await waitOrders();
+  if (!painted) throw new Error('страница заказов не отрисовалась за 20 с — проверь логин');
+
+  const visible = String(await runJS('document.visibilityState')) === 'visible';
   const list = [];
-  for (let p = 0; p < pages; p++) {
-    await go(`${R.base}/user/purchase/?type=${type}&page=${p}`, 13000);
-    const got = parseOrders(await jsonFile('orders_read'));
-    if (!got.length) break;              // past the last page
-    list.push(...got);
+  const seen = new Set();
+  let idle = 0;
+  for (let step = 0; step < 40 && idle < 3; step++) {
+    const fresh = parseOrders(await jsonFile('orders_read')).filter((o) => {
+      const k = o.order_id || `${o.shop}|${o.total}|${(o.items[0] || {}).name}`;
+      if (seen.has(k)) return false;
+      seen.add(k); return true;
+    });
+    list.push(...fresh);
+    idle = fresh.length ? 0 : idle + 1;
+    await runJS('scrollTo(0, document.body.scrollHeight); 1');
+    await sleep(1500);
   }
-  out({ region: R.code, pages_read: pages, orders: list.length, list });
+
+  const note = visible
+    ? null
+    : 'окно Chrome перекрыто: показан только первый экран истории. Покажи окно '
+      + 'или используй --query — он ищет по всей истории на сервере.';
+  out({ region: R.code, source: 'purchase-scroll', visible, orders: list.length, note, list });
 }
 
 function parseOrders(res) {
@@ -329,6 +380,44 @@ function parseOrders(res) {
       order_id: ids[n] || null, items,
     };
   }).filter((o) => o.shop && o.items.length);
+}
+
+/** Чем ответил поисковый запрос самой страницы. Повторяем его URL дословно:
+ *  свою сборку Шопи отвергает всегда — там есть подпись в параметрах сессии. */
+async function searchApiStatus() {
+  const url = String(await runJS(`(function(){
+    var e = performance.getEntriesByType('resource').filter(function(x){ return /search_items/.test(x.name); });
+    return e.length ? e[e.length - 1].name : '';
+  })()`) || '');
+  if (!url) return 'запроса поиска вообще не было';
+  await runJS(`(function(){ window.__sst = null;
+    fetch(${JSON.stringify(url)}, {credentials:'include'}).then(function(r){ return r.text().then(function(t){
+      var j = null; try { j = JSON.parse(t); } catch (e) {}
+      window.__sst = {status: r.status, error: j && j.error, items: j && j.items ? j.items.length : null};
+    });}).catch(function(e){ window.__sst = {status: 0, error: String(e).slice(0, 60)}; });
+    return 1; })()`);
+  for (let i = 0; i < 12; i++) {
+    await sleep(700);
+    const raw = String(await runJS('JSON.stringify(window.__sst)') || 'null');
+    if (raw && raw !== 'null') {
+      const d = JSON.parse(raw);
+      return d.items ? `${d.status}, товаров ${d.items}` : `${d.status}, ошибка ${d.error}`;
+    }
+  }
+  return 'ответа нет';
+}
+
+/** Дождаться карточек заказов в DOM. Фиксированной паузы не хватало: разбор
+ *  шёл по пустому дереву и скилл отдавал «заказов 0» при полной истории — проверено
+ *  на тайском кабинете. Возвращает true, если карточки появились. */
+async function waitOrders(tries = 20, everyMs = 1000) {
+  for (let i = 0; i < tries; i++) {
+    const n = Number(await runJS(
+      `document.body.innerText.split('Order Shop Section').length - 1`)) || 0;
+    if (n > 0) return true;
+    await sleep(everyMs);
+  }
+  return false;
 }
 
 /** The grid repeats a block per rendered row; key on order id, else shop+item+total. */

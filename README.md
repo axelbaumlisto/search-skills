@@ -228,3 +228,17 @@ export SKILLS_CONFIG=/path/to/skills.json
 
 Without it the skills fall back to generic defaults — they still run, they
 just don't know anything about your machine.
+
+### lazada
+
+Purchase history and catalogue search for Lazada Thailand, driven through the same
+local-Chrome bridge as the Shopee skills.
+
+```bash
+skills/lazada/scripts/lazada.sh orders --query "monitor"
+skills/lazada/scripts/lazada.sh search "portable monitor touch"
+```
+
+History is read from the page's own Ultron endpoint, so a long history takes under
+ten requests instead of one click per page. Catalogue search does not depend on the
+browser window being visible — unlike Shopee TH search, which does.

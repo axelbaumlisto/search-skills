@@ -17,6 +17,12 @@ CITIES="bangkok pattaya phuket samui phangan chiangmai krabi danang hcmc hanoi n
 
 QUERY=""; CITY=""; LIMIT=10; MODE="search"; WAIT=150; RAW=0
 LAT=""; LNG=""; RADIUS=""; MINP=""; MAXP=""
+# Пути к сессии и окружению — машинно-зависимые, поэтому снаружи. Значения по
+# умолчанию рассчитаны на дефолтную установку; переопределяются переменными.
+FB_COOKIES="${FB_COOKIES:-$HOME/.config/fb-marketplace/facebook.cookies.txt}"
+FB_PYTHON="${FB_PYTHON:-python3}"
+FB_REMOTE_DIR="${FB_REMOTE_DIR:-.}"
+
 while [ $# -gt 0 ]; do
   case "$1" in
     --detail)  MODE="detail"; QUERY="$2"; shift 2;;
@@ -38,7 +44,7 @@ if [ "$MODE" = "health" ]; then
   ssh -n -o ConnectTimeout=10 "$REMOTE" \
     'systemctl --user is-active chrome-cdp.service; curl -s -m 5 http://localhost:9222/json/version | head -3' \
     || { echo "cannot reach $REMOTE" >&2; exit 1; }
-  echo "hint: if Facebook is logged out, sign in once via https://YOUR-HOST/vnc
+  echo "hint: if Facebook is logged out, sign in once via ${FB_VNC_URL:-https://YOUR-HOST/vnc}"
   exit 0
 fi
 
@@ -78,19 +84,19 @@ if [ "$MODE" = "search" ] && [ -f "$LOCAL" ] && [ -z "$LAT" ]; then
   LOCAL_SESSION="${FB_LOCAL_SESSION:-auto}"
   if [ "$LOCAL_SESSION" = "auto" ]; then
     if grep -q "exported from Chrome profile" \
-         "$HOME/work/tg_agent/naked/.secrets/cookies/facebook.cookies.txt" 2>/dev/null; then
+         "$FB_COOKIES" 2>/dev/null; then
       LOCAL_SESSION=1
     else
       LOCAL_SESSION=0
     fi
   fi
   if [ "$LOCAL_SESSION" = "1" ]; then
-    LOUT=$("$HOME/work/tg_agent/naked/.venv/bin/python" "$LOCAL" "${LARGS[@]}" 2>/dev/null)
+    LOUT=$("$FB_PYTHON" "$LOCAL" "${LARGS[@]}" 2>/dev/null)
   else
     scp -q "$LOCAL" "$REMOTE:/tmp/fb_local.py" 2>/dev/null
     QARGS=$(printf '%q ' "${LARGS[@]}")
     LOUT=$(ssh -n -o ConnectTimeout=10 "$REMOTE" \
-      "cd ~/work/tg_agent && python3 /tmp/fb_local.py $QARGS" 2>/dev/null)
+      "cd $FB_REMOTE_DIR && python3 /tmp/fb_local.py $QARGS" 2>/dev/null)
   fi
 
   if printf '%s' "$LOUT" | grep -q '"blocked"'; then
@@ -111,7 +117,7 @@ fi
 # tab and silently return the wrong listing. Serialise every browser job
 # (this script and browser-scout share /tmp/fb-browser.lock).
 ssh -n -o ConnectTimeout=10 "$REMOTE" \
-  "cd ~/work/tg_agent && nohup flock -w 300 /tmp/fb-browser.lock python3 $FB $ARGS >$OUT 2>$ERR & echo ok" >/dev/null \
+  "cd $FB_REMOTE_DIR && nohup flock -w 300 /tmp/fb-browser.lock python3 $FB $ARGS >$OUT 2>$ERR & echo ok" >/dev/null \
   || { echo "cannot start remote job on $REMOTE" >&2; exit 1; }
 
 for _ in $(seq 1 "$((WAIT / 5))"); do

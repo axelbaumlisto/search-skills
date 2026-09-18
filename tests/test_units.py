@@ -8,7 +8,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "skills" / "fb-marketplace" / "scripts"))
 
-import fb_graphql as g  # noqa: E402
+import fb_local as g  # noqa: E402   # модуль переименован из fb_graphql
 
 
 class MergeVariables(unittest.TestCase):

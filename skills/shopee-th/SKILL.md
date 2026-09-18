@@ -10,7 +10,8 @@ Everything country-specific lives in one table, `shopee-search/scripts/regions.c
 This skill only pins `SHOPEE_REGION=th`. To support another Shopee country, add a key
 there; never copy the scripts.
 
-Account: `zverozabr` (userid 241866006, TH phone). Different account from the VN skill.
+The TH account is usually a different Shopee account from the VN one: the session is
+taken from whichever account is logged in to shopee.co.th in the local Chrome.
 
 ## Commands
 
