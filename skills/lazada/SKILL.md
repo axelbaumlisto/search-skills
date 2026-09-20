@@ -1,9 +1,9 @@
 ---
 name: lazada-search
-description: Read the purchase history of a Lazada Thailand (lazada.co.th) account and search the catalogue — what was ordered, from which shop, for how much, in which state, plus live prices, sold counts and review counts. Use when the user asks whether they bought something before, wants the price of a past purchase, needs to recall a shop, checks unfinished orders, or wants current Thai prices — "did I buy", "what did I order", "find it in my orders", "how much did I pay for", "search lazada".
+description: Read the purchase history of a Lazada Thailand (lazada.co.th) account, search the catalogue, and manage that account's cart — what was ordered, from which shop, for how much, in which state, plus live prices, sold counts, review counts, and adding or removing cart items. Use when the user asks whether they bought something before, wants the price of a past purchase, needs to recall a shop, checks unfinished orders, wants current Thai prices, or wants something put in the cart — "did I buy", "what did I order", "how much did I pay for", "search lazada", "add to cart", "what is in my cart".
 ---
 
-# Lazada Thailand: orders + catalogue search
+# Lazada Thailand: orders + catalogue search + cart
 
 Reads from the live, logged-in Chrome. Thailand only: one country, so there is no
 region table — a second country means adding the host here, not copying the skill.
@@ -20,6 +20,10 @@ $S/lazada.sh orders --tab TO_SHIP                # ALL TO_PAY TO_SHIP TO_RECEIVE
 $S/lazada.sh orders --json                       # machine-readable
 $S/lazada.sh search "portable monitor touch"     # catalogue search
 $S/lazada.sh search "..." --sort priceasc        # priceasc | pricedesc | pop
+$S/lazada.sh cart                                # what is in the cart
+$S/lazada.sh add "<url or pdp-id>" --qty 2       # put an item in the cart
+$S/lazada.sh cart --remove 2                     # drop line 2
+$S/lazada.sh cart --remove "printer"             # or drop by words in the title
 ```
 
 Words in `--query` are split on spaces or a vertical bar and matched with OR logic
@@ -52,6 +56,30 @@ a `^^$$<md5>{$_$}` prefix, wrapping a `QueryBuyerOrderListRequest` with `tab`, `
 
 **The async endpoint `/customer/api/async/order-list` is not needed.** It wants a full
 Ultron payload with per-component signatures; sync with `page` does the same job.
+
+## Cart, and what bites there
+
+`add` takes a full URL, a `pdp-i123...` slug or a bare id. The page is opened, the
+quantity stepper is clicked `qty - 1` times, then the button is pressed and the
+`Added to cart successfully` toast is checked.
+
+**Press the button by its text, not its class.** `Add to Cart` carries
+`add-to-cart-buy-now-btn`, while the neighbouring `Buy Now` carries `add-to-cart`.
+A class-prefix selector therefore starts a checkout instead of filling the cart.
+
+**The add request cannot be intercepted.** Hooks on `fetch` and `XMLHttpRequest`
+catch nothing on click, so the toast is the only available confirmation.
+
+**The first `input` in a cart row is the select checkbox** with value `on`, not the
+quantity. The number lives in `.next-number-picker input`; reading the first input
+reports every line as `x1`.
+
+**Shop names come from the group, not the page.** Each `.checkout-shop-outer` holds
+one shop title; taking the first `[class*=shop-title]` on the page stamps every line
+with the same shop.
+
+**Removal always asks.** The trash icon opens a `Remove from cart` modal with
+`REMOVE` and `CANCEL`; without that second click the line stays.
 
 ## Gotchas
 

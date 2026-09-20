@@ -23,7 +23,9 @@ const bridge = require(BRIDGE);
 
 const HOST = 'my.lazada.co.th';
 const SHOP_HOST = 'www.lazada.co.th';
+const CART_HOST = 'cart.lazada.co.th';
 const ORDERS_URL = `https://${HOST}/customer/order/index/`;
+const CART_URL = `https://${CART_HOST}/cart`;
 const API = '/customer/api/sync/order-list';
 const CUR = '฿';
 
@@ -198,4 +200,104 @@ function parseCard(c) {
   };
 }
 
-module.exports = { orders, filter, fetchPage, ensurePage, search, parseCard, HOST, CUR, TABS };
+/** Ссылка на товар из чего угодно: полный URL, короткий pdp-id, голый id. */
+function productUrl(target) {
+  const t = String(target || '').trim();
+  if (/^https?:\/\//.test(t)) return t;
+  const id = (t.match(/i(\d{6,})/) || [])[1];
+  if (!id) throw new Error(`не похоже на товар: ${t}`);
+  return `https://${SHOP_HOST}/products/pdp-i${id}.html`;
+}
+
+/** Содержимое корзины. */
+async function cart() {
+  const fs = require('fs');
+  const here = String(await bridge.runJS('location.href')) || '';
+  if (!here.includes('cart.lazada')) {
+    await bridge.go(CART_URL, 16000);
+    await bridge.sleep(6000);
+  }
+  const reader = fs.readFileSync(path.join(__dirname, 'js/cart_read.js'), 'utf8');
+  return JSON.parse(String(await bridge.runJS(reader)) || '{"items":[]}');
+}
+
+/** Положить товар в корзину.
+ *
+ *  Кнопка ищется по тексту, а не по классу: класс у неё
+ *  add-to-cart-buy-now-btn, но рядом живёт add-to-cart у «Buy Now», и выбор по
+ *  префиксу класса приводит к мгновенному оформлению заказа вместо корзины.
+ *  Подтверждение — всплывающее «Added to cart successfully», сетевого ответа
+ *  перехватить нельзя: запрос уходит мимо fetch и XHR.
+ */
+async function addToCart(target, { qty = 1 } = {}) {
+  const url = productUrl(target);
+  await bridge.go(url, 16000);
+  await bridge.sleep(6000);
+
+  if (qty > 1) {
+    await bridge.runJS(`(function(){
+      var up = document.querySelector('[class*=next-number-picker-handler-up]');
+      if (!up) return 'нет счётчика';
+      for (var i = 1; i < ${Number(qty)}; i++) up.click();
+      return 'ok';
+    })()`);
+    await bridge.sleep(1200);
+  }
+
+  const clicked = String(await bridge.runJS(`(function(){
+    var hit = null;
+    document.querySelectorAll('button').forEach(function(el){
+      var t = (el.innerText || '').trim().toLowerCase();
+      if (t === 'add to cart' || t.indexOf('\u0e2b\u0e22\u0e34\u0e1a\u0e43\u0e2a\u0e48\u0e15\u0e30\u0e01\u0e23\u0e49\u0e32') > -1) hit = el;
+    });
+    if (!hit) return 'кнопки «Add to Cart» нет — возможно, нужен выбор варианта';
+    hit.click();
+    return 'ok';
+  })()`));
+  if (clicked !== 'ok') throw new Error(clicked);
+
+  await bridge.sleep(5000);
+  const ok = String(await bridge.runJS(`(function(){
+    var t = document.body.innerText;
+    return /added to cart|\u0e2b\u0e22\u0e34\u0e1a\u0e43\u0e2a\u0e48\u0e15\u0e30\u0e01\u0e23\u0e49\u0e32\u0e40\u0e23\u0e35\u0e22\u0e1a\u0e23\u0e49\u0e2d\u0e22/i.test(t) ? 'ok' : 'нет подтверждения';
+  })()`));
+  return { url, qty, confirmed: ok === 'ok' };
+}
+
+/** Убрать позицию: номер из cart() или кусок названия. */
+async function removeFromCart(pick) {
+  const before = await cart();
+  const byIndex = /^\d+$/.test(String(pick));
+  const target = byIndex
+    ? before.items.find((i) => i.index === Number(pick))
+    : before.items.find((i) => new RegExp(String(pick).replace(/[.*+?^${}()[\]\\]/g, '\\$&'), 'i')
+      .test([i.title, i.variant].filter(Boolean).join(' ')));
+  if (!target) throw new Error(`в корзине нет позиции «${pick}»`);
+
+  await bridge.runJS(`(function(){
+    var rows = document.querySelectorAll('.cart-item');
+    var row = rows[${target.index - 1}];
+    if (!row) return 'нет строки';
+    var del = row.querySelector('[class*=automation-btn-delete], [class*=icon-Delete]');
+    if (!del) return 'нет кнопки удаления';
+    del.click();
+    return 'ok';
+  })()`);
+  await bridge.sleep(2500);
+  // Удаление всегда спрашивает подтверждение модалкой «Remove from cart»
+  // с кнопками REMOVE и CANCEL. Без этого шага позиция остаётся на месте.
+  await bridge.runJS(`(function(){
+    var b = Array.prototype.slice.call(document.querySelectorAll('button, a, span[role=button]'))
+      .find(function(e){ var t=(e.innerText||'').trim().toLowerCase();
+        return t === 'remove' || t === '\u0e25\u0e1a' || t === 'ok' || t === 'confirm'; });
+    if (!b) return 'нет кнопки подтверждения';
+    b.click();
+    return 'ok';
+  })()`);
+  await bridge.sleep(4000);
+  const after = await cart();
+  return { removed: target, left: after.items.length };
+}
+
+module.exports = { orders, filter, fetchPage, ensurePage, search, parseCard,
+  cart, addToCart, removeFromCart, productUrl, HOST, CUR, TABS };

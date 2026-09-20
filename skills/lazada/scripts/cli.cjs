@@ -1,5 +1,5 @@
 /** CLI поверх lazada.cjs. Разбор аргументов и печать — здесь; логика запросов там. */
-const { orders, filter, search, CUR, TABS } = require('./lazada.cjs');
+const { orders, filter, search, cart, addToCart, removeFromCart, CUR, TABS } = require('./lazada.cjs');
 
 function args(argv) {
   const o = { cmd: argv[0] || 'orders', query: null, pages: 10, pageSize: 100, tab: 'ALL', json: false, sort: null };
@@ -11,6 +11,8 @@ function args(argv) {
     else if (a === '--tab') o.tab = String(argv[++i]).toUpperCase();
     else if (a === '--json') o.json = true;
     else if (a === '--sort') o.sort = argv[++i];   // priceasc | pricedesc | pop
+    else if (a === '--qty') o.qty = Number(argv[++i]);
+    else if (a === '--remove') o.remove = argv[++i];
     else if (!o.query) o.query = a;
   }
   return o;
@@ -30,6 +32,34 @@ function table(items) {
 (async () => {
   const o = args(process.argv.slice(2));
   const quiet = o.json;
+  if (o.cmd === 'cart') {
+    if (o.remove !== undefined) {
+      const r = await removeFromCart(o.remove);
+      if (o.json) { console.log(JSON.stringify(r, null, 2)); return; }
+      console.log(`убрано: ${r.removed.title.slice(0, 60)}`);
+      console.log(`осталось позиций: ${r.left}`);
+      return;
+    }
+    const c = await cart();
+    if (o.json) { console.log(JSON.stringify(c, null, 2)); return; }
+    if (!c.items.length) { console.log('корзина пуста'); return; }
+    console.log(`в корзине позиций: ${c.items.length}\n`);
+    for (const i of c.items) {
+      console.log(`  ${String(i.index).padStart(2)}. ${(i.priceText || '—').padStart(10)} x${String(i.qty).padEnd(2)}`
+        + ` ${i.checked ? '✓' : ' '} ${(i.title || '').slice(0, 52)}`);
+      if (i.variant) console.log(`      └ ${i.variant}   ${i.shop || ''}`);
+    }
+    if (c.total) console.log(`\n  итого по отмеченным: ${CUR}${c.total}`);
+    return;
+  }
+  if (o.cmd === 'add') {
+    const r = await addToCart(o.query, { qty: o.qty || 1 });
+    if (o.json) { console.log(JSON.stringify(r, null, 2)); return; }
+    console.log(r.confirmed
+      ? `добавлено в корзину (x${r.qty}): ${r.url}`
+      : `кнопка нажата, но подтверждения не было — проверь вариант товара: ${r.url}`);
+    return;
+  }
   if (o.cmd === 'search') {
     const items = await search(o.query, { limit: o.pageSize > 40 ? 40 : o.pageSize, sort: o.sort });
     if (o.json) { console.log(JSON.stringify({ query: o.query, returned: items.length, items }, null, 2)); return; }
@@ -44,7 +74,7 @@ function table(items) {
     return;
   }
   if (o.cmd !== 'orders') {
-    console.error(`команда «${o.cmd}» не поддержана; есть: orders, search`);
+    console.error(`команда «${o.cmd}» не поддержана; есть: orders, search, cart, add`);
     process.exit(2);
   }
   const all = await orders({ pages: o.pages, pageSize: o.pageSize, tab: o.tab,
