@@ -1,10 +1,10 @@
 from datetime import datetime, timezone
 
-from rental_monitor.filters import matches
-from rental_monitor.geo import distance_km, guess_coords
-from rental_monitor.models import Listing
-from rental_monitor.report import render_markdown, render_message
-from rental_monitor.store import State
+from listing_monitor.filters import matches
+from listing_monitor.geo import distance_km, guess_coords
+from listing_monitor.models import Listing
+from listing_monitor.report import render_markdown, render_message
+from listing_monitor.store import State
 
 
 def L(**kw):
@@ -38,11 +38,11 @@ def test_geo_bound_source_skips_city_check(cfg):
     assert matches(L(text="Nhà 2 PN", title="Nhà", geo_bound=True), cfg) == (True, "ok")
 
 
-def test_distance_and_guess():
+def test_distance_and_guess(cfg):
     assert round(distance_km(10.19538, 103.96795, 10.19538, 103.96795), 3) == 0
     assert 9 < distance_km(10.19538, 103.96795, 10.1116, 103.9839) < 10.5
-    assert guess_coords("между Ong Lang и Duong Dong") is not None
-    assert guess_coords("где-то на острове") is None
+    assert guess_coords("между Ong Lang и Duong Dong", cfg.districts) is not None
+    assert guess_coords("где-то на острове", cfg.districts) is None
 
 
 def test_state_new_and_sent(tmp_path):

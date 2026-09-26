@@ -1,4 +1,4 @@
-"""Разбор свободного текста объявлений: цена, спальни, «сдаю/ищу». Чистые функции."""
+"""Разбор свободного текста объявлений: цена, спальни, «даю/ищу». Чистые функции."""
 from __future__ import annotations
 
 import re
@@ -20,7 +20,7 @@ def parse_price_vnd(text: str) -> int | None:
         return int(re.sub(r"[^\d]", "", m.group(1)))
     if m := re.search(_NUM + r"\s*tỷ", t):
         return int(_f(m.group(1)) * 1_000_000_000)
-    if m := re.search(_NUM + r"\s*(?:tr\b|tr(?=[\s/.,)]|$)|triệu|млн|миллион\w*|mil\b|m\b|м(?![²2а-яё]))", t):
+    if m := re.search(_NUM + r"\s*(?:tr\b|tr(?=[\s/.,)]|$)|triệu|млн|миллион\w*|mln\b|mill?\b|million\b|m\b|м(?![²2а-яё]))", t):
         return int(_f(m.group(1)) * 1_000_000)
     if m := re.search(r"\$\s*" + _NUM + r"|" + _NUM + r"\s*(?:\$|usd)", t):
         return int(_f(m.group(1) or m.group(2)) * USD_VND)
@@ -37,16 +37,21 @@ def parse_bedrooms(text: str) -> int | None:
     return None
 
 
-_SEEKING = re.compile(r"кто сда[её]т|ищ(у|ем|ет)|сниму|сними|снять|cần thuê|tìm thuê|tìm nhà|looking for|\?\s*$", re.M)
-_OFFER = re.compile(r"сда[её]тся|сда[мю]\b|сдаю|арендная плата|аренда (дом|вилл|квартир)|cho thuê|for rent|#фукуок")
-_NOT_HOUSING = re.compile(r"байк|скутер|мотоцикл|xe máy|bike|авто в аренду")
+# offer -> (объявление «даю», запрос «ищу»). Запрос проверяется в начале текста.
+_OFFER = {
+    "rent": re.compile(r"сда[её]тся|сда[мю]\b|сдаю|арендная плата|аренда (дом|вилл|квартир)|cho thuê|for rent"),
+    "sale": re.compile(r"продам|продаю|прода[её]тся|продажа|\bbán\b|thanh lý|pass lại|for sale|\bsell"),
+}
+_SEEKING = {
+    "rent": re.compile(r"кто сда[её]т|ищ(у|ем|ет)|сниму|сними|снять|cần thuê|tìm thuê|tìm nhà|looking for|\?\s*$", re.M),
+    "sale": re.compile(r"куплю|купим|ищ(у|ем|ет)|cần mua|tìm mua|want to buy|\bwtb\b|looking for|\?\s*$", re.M),
+}
 
 
-def is_rent_offer(text: str) -> bool:
+def is_offer(text: str, offer: str = "rent") -> bool:
+    """Объявление предложения (сдаю/продаю), а не запрос (ищу/куплю)."""
     t = text.lower()
-    if _NOT_HOUSING.search(t) or _SEEKING.search(t[:200]):
-        return False
-    return bool(_OFFER.search(t))
+    return not _SEEKING[offer].search(t[:200]) and bool(_OFFER[offer].search(t))
 
 
 _DAILY = re.compile(r"homestay|/\s*(đêm|ngày|night|сутки|ночь)|theo ngày|per night|посуточно|за ночь")

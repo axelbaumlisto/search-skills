@@ -13,7 +13,7 @@ who sells it, and what do buyers complain about" and get a real answer.
 | [remote-browser](skills/remote-browser/SKILL.md) | drive a logged-in browser on another machine: batched actions, GraphQL capture, tab hygiene | one SSH tunnel to CDP + Playwright |
 | [fb-marketplace](skills/fb-marketplace/SKILL.md) | second-hand prices in a specific city, seller listings, Page reviews | plain HTTP replay of the Marketplace GraphQL query |
 | [telegram-search](skills/telegram-search/SKILL.md) | what people actually post in local chats: listings, contacts, rentals | Telethon over your joined chats |
-| [rental-monitor](skills/rental-monitor/SKILL.md) | keep watching VN long-term rentals and get only new matches in Telegram | Chợ Tốt API + Facebook + Telegram + muaban, one TOML per search, uv + pytest |
+| [listing-monitor](skills/listing-monitor/SKILL.md) | keep watching VN classifieds (rentals, used bikes, anything) and get only new matches in Telegram | Chợ Tốt API + Facebook + Telegram + muaban, one TOML per search, uv + pytest |
 
 No scraping farm, no proxies, no account farms: every skill is a thin, paced
 wrapper around a session you already have. (A separate secondary account for

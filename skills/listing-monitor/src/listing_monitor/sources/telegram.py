@@ -5,21 +5,25 @@ import asyncio
 from datetime import datetime, timedelta, timezone
 
 from ..models import Listing
-from ..parse import is_rent_offer, parse_bedrooms, parse_price_vnd
+from ..parse import is_offer, parse_bedrooms, parse_price_vnd
 from ..tg import client
 
 
-def parse(messages: list[dict]) -> list[Listing]:
+def parse(messages: list[dict], offer: str = "rent", chats: list[str] | None = None) -> list[Listing]:
+    """chats — белый список чатов города: сообщения только оттуда, и город считается известным."""
+    allow = {c.lower() for c in chats or []}
     out = []
     for m in messages:
         text = m.get("text") or ""
-        if not m.get("chat_username") or not is_rent_offer(text):
+        if not m.get("chat_username") or not is_offer(text, offer):
+            continue
+        if allow and m["chat_username"].lower() not in allow:
             continue
         out.append(Listing(
             source="telegram", url=f"https://t.me/{m['chat_username']}/{m['id']}", title=text.split("\n", 1)[0][:80],
-            text=text, price_vnd=parse_price_vnd(text), bedrooms=parse_bedrooms(text), kind="rent",
+            text=text, price_vnd=parse_price_vnd(text), bedrooms=parse_bedrooms(text), kind=offer,
             posted=datetime.fromisoformat(m["date"]),
-            group_url=f"https://t.me/{m['chat_username']}", group_name=m.get("chat_title") or "", contact=f"@{m['author']}" if m.get("author") else m.get("chat_title", "")))
+            group_url=f"https://t.me/{m['chat_username']}", geo_bound=bool(allow), group_name=m.get("chat_title") or "", contact=f"@{m['author']}" if m.get("author") else m.get("chat_title", "")))
     return out
 
 
@@ -48,4 +52,4 @@ async def _search(session: str, queries: list[str], since: datetime) -> list[dic
 
 def fetch(cfg, since=None) -> list[Listing]:
     since = since or datetime.now(timezone.utc) - timedelta(days=cfg.telegram.get("days", 3))
-    return parse(asyncio.run(_search(cfg.telegram["session"], cfg.telegram["queries"], since)))
+    return parse(asyncio.run(_search(cfg.telegram["session"], cfg.telegram["queries"], since)), cfg.offer, cfg.telegram.get("chats"))

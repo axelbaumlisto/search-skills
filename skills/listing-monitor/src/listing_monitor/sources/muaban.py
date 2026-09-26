@@ -32,7 +32,7 @@ async def main(urls):
         print(json.dumps(res, ensure_ascii=False))
 asyncio.run(main(sys.argv[1:]))
 '''
-REMOTE_PATH = "/tmp/rental_monitor_muaban.py"
+REMOTE_PATH = "/tmp/listing_monitor_muaban.py"
 
 
 def parse(cards: list[dict]) -> list[Listing]:

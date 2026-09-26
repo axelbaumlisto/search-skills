@@ -10,8 +10,11 @@ from pathlib import Path
 class Config:
     name: str
     max_price_vnd: int
-    min_bedrooms: int
-    city_keywords: list[str]
+    city_keywords: list[str]                # город в тексте — для источников без гео-привязки
+    offer: str = "rent"                     # rent | sale
+    min_bedrooms: int = 0                   # 0 = спальни не нужны (не жильё)
+    include_any: list[str] = field(default_factory=list)       # хотя бы одно слово категории (road, đua…)
+    districts: dict = field(default_factory=dict)              # "район" = [lat, lng] для расстояний
     exclude_keywords: list[str] = field(default_factory=list)   # другие города — гео-поиск FB их подмешивает
     center: dict = field(default_factory=dict)
     chotot: dict = field(default_factory=dict)

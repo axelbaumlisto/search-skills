@@ -38,10 +38,14 @@ def default_enrich(cfg: Config, items: list[Listing]) -> list[Listing]:
 
 
 def refresh(cfg: Config, sources: dict[str, Source] | None = None, send: Callable[[str], object] | None = None,
-            now: datetime | None = None, dry_run: bool = False, enrich: Callable | None = None) -> Result:
+            now: datetime | None = None, dry_run: bool = False, enrich: Callable | None = None,
+            since_days: int | None = None) -> Result:
     now = now or datetime.now(timezone.utc)
     state = State.load(cfg.state_path)
-    since = (state.last_run - timedelta(hours=12)) if state.last_run else now - timedelta(days=2)
+    if since_days:
+        since = now - timedelta(days=since_days)          # первый прогон нового поиска: весь текущий рынок
+    else:
+        since = (state.last_run - timedelta(hours=12)) if state.last_run else now - timedelta(days=2)
     sources = default_sources(cfg) if sources is None else sources
 
     collected, stats = [], []

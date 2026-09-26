@@ -1,8 +1,8 @@
 from datetime import datetime, timezone
 
-from rental_monitor.models import Listing
-from rental_monitor.pipeline import refresh
-from rental_monitor.store import State
+from listing_monitor.models import Listing
+from listing_monitor.pipeline import refresh
+from listing_monitor.store import State
 
 
 def mk(url, **kw):
@@ -44,7 +44,7 @@ def test_refresh_dry_run_changes_nothing(cfg, tmp_path):
 
 
 def test_registry_follows_config(cfg):
-    from rental_monitor.pipeline import default_sources
+    from listing_monitor.pipeline import default_sources
     assert set(default_sources(cfg)) == {"chotot", "facebook", "telegram", "muaban"}
     cfg.muaban = {}
     assert "muaban" not in default_sources(cfg)

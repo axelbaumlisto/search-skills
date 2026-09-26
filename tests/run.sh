@@ -25,9 +25,9 @@ done
 echo "== unit tests"
 "$PY" "$ROOT/tests/test_units.py" || fail=1
 
-echo "== rental-monitor (pytest via uv)"
+echo "== listing-monitor (pytest via uv)"
 if command -v uv >/dev/null; then
-  uv run --project "$ROOT/skills/rental-monitor" pytest -q "$ROOT/skills/rental-monitor/tests" || fail=1
+  uv run --project "$ROOT/skills/listing-monitor" pytest -q "$ROOT/skills/listing-monitor/tests" || fail=1
 else
   echo "  skip: uv not installed"
 fi

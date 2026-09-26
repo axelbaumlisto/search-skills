@@ -12,6 +12,7 @@ class Listing:
     title: str
     text: str = ""
     price_vnd: int | None = None
+    price_note: str = ""            # цена угадана (напр. «₫7,500» → 7,5 млн) — показать исходник
     bedrooms: int | None = None
     kind: str = "unknown"           # rent | sale | unknown
     lat: float | None = None

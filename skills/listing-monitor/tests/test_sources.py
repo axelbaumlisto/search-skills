@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from rental_monitor.sources import chotot, facebook, muaban, telegram
+from listing_monitor.sources import chotot, facebook, muaban, telegram
 
 
 def test_chotot_parse_keeps_only_rent_ads(fixture_json):
@@ -23,7 +23,7 @@ def test_facebook_parse_search(fixture_json):
     assert one.bedrooms == 1                             # «1 phòng ngủ» из заголовка
     assert all("\n" not in i.title for i in items)
     villa = next(i for i in items if "Villa" in i.title)
-    assert villa.price_vnd is None                       # «₫2,000» — неправдоподобно, отброшено
+    assert villa.price_vnd == 2_000_000                  # «₫2,000» = в тысячах; правдоподобие — дело min_price_vnd
 
 
 def test_facebook_detail_enriches(fixture_json):

@@ -16,8 +16,8 @@ def _mln(v: int | None) -> str:
 
 
 def _km(x: Listing, cfg: Config) -> str:
-    c = (x.lat, x.lng) if x.lat and x.lng else guess_coords(x.blob)
-    if not c:
+    c = (x.lat, x.lng) if x.lat and x.lng else guess_coords(x.blob, cfg.districts)
+    if not c or not cfg.center:
         return "?"
     return f"~{distance_km(cfg.center['lat'], cfg.center['lng'], *c):.0f}"
 
@@ -68,7 +68,10 @@ def render_message(items: list[Listing], cfg: Config, stamp: str) -> str:
         return ""
     lines = [f"{cfg.name} — новые объявления ({stamp})"]
     for i, x in enumerate(items[:10], 1):
-        head = [f"{_mln(x.price_vnd)} млн/мес", _beds(x.bedrooms), _short_title(x.title), _where(x, cfg)]
+        per = "/мес" if cfg.offer == "rent" else ""
+        price = f"~{_mln(x.price_vnd)} млн{per} (в объявлении «{x.price_note}»)" if x.price_note \
+            else f"{_mln(x.price_vnd)} млн{per}"
+        head = [price, _beds(x.bedrooms) if cfg.min_bedrooms else "", _short_title(x.title), _where(x, cfg)]
         km = _km(x, cfg)
         if km != "?":
             head.append(f"{km} км до {cfg.center['label']}")

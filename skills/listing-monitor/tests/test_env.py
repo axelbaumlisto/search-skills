@@ -1,5 +1,5 @@
-from rental_monitor import tg
-from rental_monitor.config import load_config
+from listing_monitor import tg
+from listing_monitor.config import load_config
 
 
 def test_env_file_from_config_feeds_telegram_creds(tmp_path, monkeypatch):
@@ -20,6 +20,6 @@ def test_repo_style_names_win(monkeypatch):
 
 
 def test_remote_path_expands_home_on_remote_side():
-    from rental_monitor.remote import remote_path
+    from listing_monitor.remote import remote_path
     assert remote_path("~/a b/x.py") == "\"$HOME\"/'a b/x.py'"
     assert remote_path("/opt/x.py") == "/opt/x.py"

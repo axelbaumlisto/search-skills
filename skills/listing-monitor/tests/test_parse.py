@@ -1,6 +1,6 @@
 import pytest
 
-from rental_monitor.parse import is_rent_offer, parse_bedrooms, parse_price_vnd
+from listing_monitor.parse import is_offer, parse_bedrooms, parse_price_vnd
 
 
 @pytest.mark.parametrize("text, expected", [
@@ -47,4 +47,4 @@ def test_parse_bedrooms(text, expected):
     ("АРЕНДА БАЙКОВ, скутеры", False),
 ])
 def test_is_rent_offer(text, expected):
-    assert is_rent_offer(text) is expected
+    assert is_offer(text, "rent") is expected

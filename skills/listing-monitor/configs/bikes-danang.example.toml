@@ -1,0 +1,50 @@
+# Example: used road bikes for sale in Da Nang up to 15M VND.
+# Copy outside the repo, fill in sessions/host/recipient, run with --config <file>.
+name = "Дананг — шоссейники"
+env_file = "~/.config/search-skills/.env"   # TG_API_ID / TG_API_HASH
+offer = "sale"
+min_price_vnd = 1_000_000          # ниже — запчасти, аксессуары, «₫1» вместо цены
+max_price_vnd = 15_000_000
+city_keywords = ["дананг", "đà nẵng", "da nang", "danang"]
+include_any = ["đua", "road", "шоссе", "carbon", "карбон", "claris", "sora", "tiagra", "105", "ultegra",
+               "twitter", "giant", "trek", "merida", "scott", "bianchi", "cannondale", "specialized", "java"]
+exclude_keywords = ["xe đạp điện", "giày", "shoe", "mũ bảo hiểm", "helmet", "phụ kiện", "cho xe đạp", "trẻ em", "cho bé",
+                    "sườn carbon", "size xs", "hà nội", "hồ chí minh", "sài gòn"]
+
+[center]
+label = "Cầu Rồng"
+lat = 16.0612
+lng = 108.2272
+
+[districts]
+"hải châu" = [16.0544, 108.2022]
+"sơn trà" = [16.0880, 108.2370]
+"ngũ hành sơn" = [16.0020, 108.2520]
+"thanh khê" = [16.0660, 108.1850]
+"liên chiểu" = [16.0750, 108.1500]
+"cẩm lệ" = [16.0150, 108.1950]
+
+[chotot]
+region_v2 = 3017          # Đà Nẵng
+categories = [2060]       # Xe đạp
+
+[facebook]
+queries = ["xe đạp đua", "road bike", "roadbike"]
+city = "danang"           # preset of fb_marketplace.py
+limit = 40
+max_details = 3
+remote_host = "browser-host"
+remote_script = "~/search-skills/skills/fb-marketplace/scripts/fb_marketplace.py"
+
+[telegram]
+session = "~/.config/search-skills/tg/research"
+queries = ["продам велосипед", "шоссейник", "продам шоссейный", "xe đạp đua"]
+chats = ["danang3"]       # только чаты этого города
+
+[notify]
+session = "~/.config/search-skills/tg/default"
+peer_id = "username_or_numeric_id"
+
+[paths]
+state = "bikes_state.json"
+master = "bikes.md"
