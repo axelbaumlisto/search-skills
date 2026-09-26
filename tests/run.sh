@@ -25,6 +25,13 @@ done
 echo "== unit tests"
 "$PY" "$ROOT/tests/test_units.py" || fail=1
 
+echo "== rental-monitor (pytest via uv)"
+if command -v uv >/dev/null; then
+  uv run --project "$ROOT/skills/rental-monitor" pytest -q "$ROOT/skills/rental-monitor/tests" || fail=1
+else
+  echo "  skip: uv not installed"
+fi
+
 echo "== no secrets / no machine paths in tracked files"
 # Сам этот файл содержит искомый шаблон, поэтому исключён — иначе тест
 # всегда падал на собственной строке.

@@ -1,0 +1,46 @@
+# Example search: 2-bedroom house in Phu Quoc up to 20M VND/month.
+# Copy outside the repo, fill in sessions/host/recipient, run with --config <file>.
+name = "Фукуок"
+env_file = "~/.config/search-skills/.env"   # TG_API_ID / TG_API_HASH
+max_price_vnd = 20_000_000
+min_price_vnd = 3_500_000    # дешевле за дом с 2 спальнями не бывает — это цена за ночь
+min_bedrooms = 2
+exclude_keywords = ["nha trang", "нячанг", "đà nẵng", "da nang", "дананг", "hội an", "хойан", "hồ chí minh", "sài gòn", "hcm", "hà nội", "vũng tàu", "đà lạt"]
+city_keywords = ["фукуок", "phú quốc", "phu quoc", "phuquoc", "dương đông", "duong dong", "дуонг донг",
+                 "ông lang", "ong lang", "онг ланг", "an thới", "антхой", "meyhomes", "suối đá", "cửa lấp"]
+
+[center]
+label = "KingKong Mart"
+lat = 10.19538
+lng = 103.96795
+
+[chotot]
+area_v2 = 503112          # Thành phố Phú Quốc
+categories = [1000]       # вся недвижимость; аренда отбирается по type=u
+
+[facebook]
+queries = ["cho thuê nhà", "nhà nguyên căn", "house for rent", "аренда дом"]
+lat = 10.1954
+lng = 103.968
+radius_km = 25
+limit = 30
+max_details = 5
+remote_host = "browser-host"      # ssh host with logged-in Chrome on CDP :9222
+remote_script = "~/search-skills/skills/fb-marketplace/scripts/fb_marketplace.py"   # path on that host
+
+[telegram]
+session = "~/.config/search-skills/tg/research"      # authorized Telethon session used for search
+queries = ["Фукуок аренда", "Фукуок сдам", "Фукуок дом", "фукуок спальни", "Phu Quoc rent", "cho thuê nhà Phú Quốc"]
+
+[muaban]
+urls = ["https://muaban.net/bat-dong-san/cho-thue-nha-dat-kien-giang",
+        "https://muaban.net/bat-dong-san/cho-thue-nha-dat-an-giang"]
+remote_host = "browser-host"      # ssh host with logged-in Chrome on CDP :9222
+
+[notify]
+session = "~/.config/search-skills/tg/default"       # account that sends the notifications
+peer_id = "username_or_numeric_id"   # recipient
+
+[paths]
+state = "state.json"
+master = "rentals.md"
