@@ -51,6 +51,10 @@ def main(argv: list[str] | None = None) -> int:
         st = State.load(cfg.state_path)
         before = len(st.seen)
         st.seen = set(st.seen) & set(st.sent)
+        if a.dry_run:                    # --dry-run обязан быть безвредным: только показываем
+            print(f"recheck (dry-run): снял бы «виденное» с {before - len(st.seen)} объявлений, "
+                  f"состояние не тронуто")
+            return 0
         st.save()
         print(f"recheck: снято «виденное» с {before - len(st.seen)} объявлений, "
               f"отправленные {len(st.sent)} не тронуты")

@@ -186,3 +186,20 @@ def test_same_ad_reposted_to_several_groups_sent_once(tmp_path):
     other = Listing(source="fb_groups", url="https://www.facebook.com/photo/?fbid=3&set=pcb.3",
                     title="x", text="CHO THUÊ CĂN HỘ STUDIO TẠI AN THỚI, đầy đủ nội thất, 6 triệu")
     assert len(State.load(tmp_path / "s2.json").new([items[0], other])) == 2
+
+
+def test_recheck_with_dry_run_does_not_touch_state(tmp_path, monkeypatch):
+    """--dry-run обязан быть безвредным: --recheck не должен переписывать state."""
+    import json
+    from listing_monitor import cli
+
+    state = tmp_path / "s.json"
+    state.write_text(json.dumps({"seen": ["a", "b"], "sent": ["b"]}))
+    cfg_file = tmp_path / "c.toml"
+    cfg_file.write_text(
+        f'name = "t"\noffer = "rent"\nmax_price_vnd = 20000000\ncity_keywords = ["phu quoc"]\n'
+        f'[paths]\nstate = "{state}"\nmaster = "{tmp_path}/m.md"\n')
+
+    before = state.read_text()
+    cli.main(["refresh", "--config", str(cfg_file), "--recheck", "--dry-run"])
+    assert state.read_text() == before          # ни байта не изменилось
