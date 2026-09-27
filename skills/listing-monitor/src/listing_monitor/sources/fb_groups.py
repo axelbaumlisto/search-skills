@@ -101,11 +101,15 @@ def _run_remote(g: dict) -> str:
     put_file(host, REMOTE_SCRIPT.read_text(encoding='utf-8'), f'{REMOTE_DIR}/fb_group_search_remote.py',
              mkdir=REMOTE_DIR)
     put_file(host, json.dumps(dom, ensure_ascii=False), f'{REMOTE_DIR}/lm_fb_dom.json')
+    limit_sec = g.get('timeout_sec', 900)
     cmd = (f'python3 {remote_path(REMOTE_DIR + "/fb_group_search_remote.py")} '
            f'--groups {shlex.quote(",".join(g["groups"]))} '
            f'--queries {shlex.quote(",".join(g["queries"]))} '
-           f'--limit {g.get("limit", 10)}')
-    return run_detached(host, cmd, timeout=g.get('timeout_sec', 900))
+           f'--limit {g.get("limit", 10)} '
+           # скрипт обязан свернуться раньше, чем ssh-обёртка его убьёт,
+           # иначе собранное пропадёт вместе с процессом
+           f'--budget-sec {max(60, limit_sec - 120)}')
+    return run_detached(host, cmd, timeout=limit_sec)
 
 
 def fetch(cfg, since=None) -> list[Listing]:

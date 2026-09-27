@@ -17,6 +17,7 @@ import argparse
 import json
 import os
 import sys
+import time
 import urllib.parse
 from pathlib import Path
 
@@ -24,10 +25,35 @@ CDP = os.environ.get('FB_CDP_ENDPOINT', 'http://localhost:9222')
 DOM_PATH = Path(__file__).with_name('lm_fb_dom.json')
 
 
+# Facebook иногда отвечает дольше минуты. Ждать «полной загрузки» бессмысленно:
+# лента догружается бесконечно, поэтому ждём только DOM и потом фиксированную паузу.
+GOTO_TIMEOUT_MS = 75_000
+SETTLE_MS = 9_000
+RETRIES = 2                 # первая попытка + одна повторная
+
+
+def _open(page, url: str) -> None:
+    """Открыть страницу, повторив один раз при таймауте.
+
+    Замер 27.09.2026: при 45 с падала примерно каждая пятнадцатая пара
+    «группа × запрос» — и её объявления просто терялись до следующего прохода.
+    """
+    last = None
+    for attempt in range(RETRIES):
+        try:
+            page.goto(url, wait_until='domcontentloaded', timeout=GOTO_TIMEOUT_MS)
+            page.wait_for_timeout(SETTLE_MS)
+            return
+        except Exception as e:                                  # noqa: BLE001
+            last = e
+            if attempt + 1 < RETRIES:
+                page.wait_for_timeout(4000)                     # дать серверу выдохнуть
+    raise last
+
+
 def search(page, dom: dict, group: str, query: str, limit: int) -> list[dict]:
     url = dom['search_url'].format(group=group, query=urllib.parse.quote(query))
-    page.goto(url, wait_until='domcontentloaded', timeout=45000)
-    page.wait_for_timeout(9000)
+    _open(page, url)
     if 'ineligible' in page.url:
         raise RuntimeError(dom['page_profile_error'])
     page.evaluate(dom['expand'])
@@ -48,6 +74,8 @@ def main() -> None:
     ap.add_argument('--groups', required=True)
     ap.add_argument('--queries', required=True)
     ap.add_argument('--limit', type=int, default=10)
+    ap.add_argument('--budget-sec', type=int, default=900,
+                    help='общий бюджет: новые пары не начинаем, отдаём найденное')
     a = ap.parse_args()
 
     dom = json.loads(DOM_PATH.read_text(encoding='utf-8'))
@@ -57,6 +85,7 @@ def main() -> None:
     from playwright.sync_api import sync_playwright
 
     posts, errors, seen = [], [], set()
+    deadline = time.monotonic() + a.budget_sec
     with sync_playwright() as pw:
         browser = pw.chromium.connect_over_cdp(CDP)
         ctx = browser.contexts[0] if browser.contexts else browser.new_context()
@@ -64,6 +93,11 @@ def main() -> None:
         try:
             for g in groups:
                 for q in queries:
+                    # Лучше отдать девять групп из десяти, чем упереться в общий
+                    # таймаут и не отдать ничего.
+                    if time.monotonic() > deadline:
+                        errors.append({'group': g, 'query': q, 'error': 'бюджет времени исчерпан'})
+                        continue
                     try:
                         for r in search(page, dom, g, q, a.limit):
                             key = (r['url'], r['text'][:80])
