@@ -161,3 +161,28 @@ def test_links_group_and_post():
                 group_url="https://www.facebook.com/groups/g", group_name="Phu Quoc Rent")
     out2 = _links(y)
     assert len(out2) == 1 and "найти пост поиском внутри группы" in out2[0]
+
+
+def test_same_ad_reposted_to_several_groups_sent_once(tmp_path):
+    """Один дом в трёх группах = три ссылки. Человеку он нужен один раз."""
+    from listing_monitor.store import State
+    from listing_monitor.models import Listing
+
+    body = ("CHO THUÊ NHÀ NGUYÊN CĂN 2 PHÒNG NGỦ GẦN KHU ÔNG LANG - PHÚ QUỐC "
+            "FULL NỘI THẤT, SÂN VƯỜN, ĐƯỜNG OTO. Giá 15 triệu/tháng.")
+    items = [
+        Listing(source="fb_groups", url="https://www.facebook.com/photo/?fbid=1&set=pcb.1",
+                title=body[:60], text=body),
+        # перепечатка: эмодзи, другой перенос строк, свой телефон в конце
+        Listing(source="fb_groups", url="https://www.facebook.com/photo/?fbid=2&set=pcb.2",
+                title=body[:60], text="🏠 " + body.replace(" - ", "\n– ") + " LH: 0909 111 222"),
+        Listing(source="facebook", url="https://www.facebook.com/marketplace/item/9/",
+                title=body[:60], text=body.upper()),
+    ]
+    st = State.load(tmp_path / "s.json")
+    assert len(st.new(items)) == 1
+
+    # разные дома с похожим началом не должны схлопываться
+    other = Listing(source="fb_groups", url="https://www.facebook.com/photo/?fbid=3&set=pcb.3",
+                    title="x", text="CHO THUÊ CĂN HỘ STUDIO TẠI AN THỚI, đầy đủ nội thất, 6 triệu")
+    assert len(State.load(tmp_path / "s2.json").new([items[0], other])) == 2
