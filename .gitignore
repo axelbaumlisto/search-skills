@@ -8,3 +8,4 @@ __pycache__/
 fb_marketplace_graphql.json
 fb_local_state.json
 .DS_Store
+package-lock.json

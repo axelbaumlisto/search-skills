@@ -38,7 +38,11 @@ export SHOPEE_REGION="$REGION"
 
 NODE_MODULES="${SHOPEE_NODE_MODULES:-$HERE/../node_modules}"
 PY="${SHOPEE_PYTHON:-python3}"
-EXPORTER="${SHOPEE_COOKIE_EXPORTER:-$HERE/chrome_cookies.py}"
+# Экспортёр кук общий для скиллов и лежит в shared/. Рядом со скриптом его держать
+# нельзя: две копии расходятся. Проверяем оба места и даём переопределить.
+if [ -n "${SHOPEE_COOKIE_EXPORTER:-}" ]; then EXPORTER="$SHOPEE_COOKIE_EXPORTER"
+elif [ -f "$HERE/chrome_cookies.py" ]; then EXPORTER="$HERE/chrome_cookies.py"
+else EXPORTER="$HERE/../../../shared/chrome_cookies.py"; fi
 UA="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36"
 
 # Keychain reads need a GUI session. Over SSH/tmux (`launchctl managername` = Background)
