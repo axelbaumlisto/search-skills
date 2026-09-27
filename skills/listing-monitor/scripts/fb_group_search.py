@@ -37,47 +37,17 @@ for _p in (Path(__file__).resolve().parents[2] / 'remote-browser' / 'scripts',
         break
 from chromebridge import Chrome, BridgeError          # noqa: E402
 
-# из карточки поста: текст, автор, ссылка на пост
-GRAB = """
-[].slice.call(document.querySelectorAll('[data-ad-rendering-role="story_message"]'))
-  .map(function(m){
-    var card = m.closest('div[role="article"]') || m.parentElement;
-    // В выдаче поиска и в ленте Facebook вырезает permalink: у метки времени
-    // остаётся href="?__cft__[0]=...". Зато ссылка на фото поста живая и ведёт
-    // к тому же посту («This photo is from a post → View Post»).
-    var photo = card ? card.querySelector('a[href*="/photo/?fbid="]') : null;
-    var href = photo ? photo.getAttribute('href').split('&__cft__')[0] : '';
-    var who = card ? card.querySelector('h2 a, h3 a, strong a') : null;
-    var t = card ? card.querySelector('abbr, a[href*="__cft__"] span') : null;
-    return {
-      text: (m.innerText||'').replace(/\\s+/g,' ').trim().slice(0,1500),
-      url: href,
-      author: who ? (who.innerText||'').trim().slice(0,60) : '',
-      time: t ? (t.innerText||'').trim().slice(0,30) : ''
-    };
-  }).filter(function(x){return x.text.length > 30}).slice(0, LIMIT)
-"""
-
-
-EXPAND = ("(function(){var c=0;"
-          "[].slice.call(document.querySelectorAll('div[role=\"button\"],span[role=\"button\"]'))"
-          ".forEach(function(b){var t=(b.innerText||'').trim();"
-          "if(t==='See more'||t==='Xem thêm'||t==='Ещё'){try{b.click();c++}catch(e){}}});"
-          "return c})()")
-
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
+from listing_monitor.fb_dom import EXPAND, PAGE_PROFILE_ERROR, SEARCH_URL, grab   # noqa: E402
 
 def search(ch: Chrome, group: str, query: str, limit: int) -> list[dict]:
-    url = (f'https://www.facebook.com/groups/{group}/search/'
-           f'?q={urllib.parse.quote(query)}')
+    url = SEARCH_URL.format(group=group, query=urllib.parse.quote(query))
     ch.goto(url, settle=9)
     if 'ineligible' in ch.url():
-        raise BridgeError('Facebook отвечает "Pages can\'t use Marketplace" — '
-                          'в Chrome активна Страница, переключись на личный профиль')
-    # Facebook сворачивает длинный пост кнопкой «See more», а цену пишут в конце —
-    # без раскрытия 23 из 31 поста уходили в отсев «нет цены» (замер 27.09.2026).
+        raise BridgeError(PAGE_PROFILE_ERROR)
     ch.js(EXPAND)
     time.sleep(1.5)
-    rows = ch.json(GRAB.replace('LIMIT', str(limit)), default=[])
+    rows = ch.json(grab(limit), default=[])
     for r in rows:
         r['group'] = group
         r['group_url'] = f'https://www.facebook.com/groups/{group}'

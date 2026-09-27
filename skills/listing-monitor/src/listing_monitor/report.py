@@ -61,8 +61,8 @@ def _links(x: Listing) -> list[str]:
         # и остаётся только группа. Тогда строку «Пост» не печатаем — пустая
         # ссылка на ту же группу выглядит как ошибка.
         if not x.url or x.url == x.group_url:
-            return [f"   Группа {name}(вступить и найти пост поиском внутри группы): {x.group_url}"]
-        return [f"   Группа {name}(вступить, чтобы открыть пост): {x.group_url}", f"   Пост: {x.url}"]
+            return [f"   Группа {name}(ссылки на пост нет — найди поиском внутри группы): {x.group_url}"]
+        return [f"   Пост: {x.url}", f"   Группа {name}: {x.group_url}"]
     if "facebook.com/marketplace" in x.url:
         return [f"   Facebook Marketplace (нужен вход в Facebook): {x.url}"]
     return [f"   {x.url}"]

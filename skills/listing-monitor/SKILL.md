@@ -79,6 +79,15 @@ limit = 8            # posts per group×query pair
 timeout_sec = 1200   # whole sweep
 ```
 
+```toml
+remote_host = "my-host"   # optional: run on the server that keeps Chrome logged in
+```
+
+- **Two transports, one set of selectors.** With `remote_host` the sweep runs on
+  the server that already hosts the Marketplace session (playwright over CDP),
+  so it survives a sleeping laptop; without it, the local Chrome is used. The
+  DOM logic lives once in `listing_monitor/fb_dom.py` and is shipped to the host
+  on every run — a stale copy there would be diagnosed for days.
 - **Personal Facebook profile only.** Under a Page every group URL redirects to
   `/marketplace/ineligible/`; the source fails loudly instead of returning zero.
 - **Posts are expanded before reading.** Facebook collapses long text behind
@@ -135,7 +144,7 @@ Linux: `0 */6 * * * uv run --project ... listing-monitor refresh --config ...` i
 | `[districts]` `"name" = [lat, lng]` | optional district table: text mention → coordinates → distance |
 | `[chotot]` `categories`, `area_v2` or `region_v2` | Chợ Tốt codes: cg 1000 real estate, 2060 bicycles, 2020 motorbikes; region 3017 Đà Nẵng, 13000 HCMC; area 503112 Phú Quốc |
 | `[facebook]` `queries`, `city` or `lat/lng/radius_km`, `limit`, `max_details`, `remote_host`, `remote_script` | geo search on the ssh host (`city` = fb_marketplace.py preset); `max_details` = card reads per run (~45 s each), only for items missing a price (or bedrooms, if required) |
-| `[fb_groups]` `groups`, `queries`, `limit`, `timeout_sec` | posts inside Facebook groups via the local Chrome; ids or slugs from `/groups/<here>` |
+| `[fb_groups]` `groups`, `queries`, `limit`, `timeout_sec`, `remote_host` | posts inside Facebook groups via the local Chrome; ids or slugs from `/groups/<here>` |
 | `[facebook]` `verify_city` | read the card to confirm the city; Marketplace geo is the seller's city, not the property's |
 | `[telegram]` `session`, `queries`, `chats` | research account session; short query stems work best; `chats` = allowlist of city chats, their posts count as the right city |
 | `[muaban]` `urls`, `remote_host` | category pages of a province (cho-thue-nha-dat-…, xe-dap-…) |

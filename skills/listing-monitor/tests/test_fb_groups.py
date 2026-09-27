@@ -1,5 +1,8 @@
 """Разбор постов групп Facebook — оффлайн, на зафиксированной выдаче."""
 from datetime import datetime, timezone
+from types import SimpleNamespace
+
+import pytest
 
 from listing_monitor.sources import fb_groups
 
@@ -153,14 +156,14 @@ def test_links_group_and_post():
                 group_name="Phu Quoc Rent")
     out = _links(x)
     assert len(out) == 2
-    assert "Группа «Phu Quoc Rent»" in out[0] and out[0].endswith("/groups/g")
-    assert out[1].endswith("fbid=1&set=pcb.2")
+    assert out[0].startswith("   Пост:") and out[0].endswith("fbid=1&set=pcb.2")   # сначала само объявление
+    assert "Группа «Phu Quoc Rent»" in out[1] and out[1].endswith("/groups/g")
 
     # ссылки на пост нет — вторую строку не печатаем, но объясняем, что делать
     y = Listing(source="fb_groups", url="https://www.facebook.com/groups/g", title="t", text="t",
                 group_url="https://www.facebook.com/groups/g", group_name="Phu Quoc Rent")
     out2 = _links(y)
-    assert len(out2) == 1 and "найти пост поиском внутри группы" in out2[0]
+    assert len(out2) == 1 and "найди поиском внутри группы" in out2[0]
 
 
 def test_same_ad_reposted_to_several_groups_sent_once(tmp_path):
@@ -203,3 +206,34 @@ def test_recheck_with_dry_run_does_not_touch_state(tmp_path, monkeypatch):
     before = state.read_text()
     cli.main(["refresh", "--config", str(cfg_file), "--recheck", "--dry-run"])
     assert state.read_text() == before          # ни байта не изменилось
+
+
+def test_remote_host_switches_transport(monkeypatch):
+    """С remote_host сбор уходит на сервер, без него — в локальный Chrome."""
+    from listing_monitor.sources import fb_groups
+
+    calls = []
+    monkeypatch.setattr(fb_groups, "_run_remote", lambda g: calls.append("remote") or '{"posts": []}')
+    monkeypatch.setattr(fb_groups, "_run_local", lambda g: calls.append("local") or '{"posts": []}')
+
+    cfg = SimpleNamespace(offer="rent", fb_groups={"groups": ["g"], "queries": ["q"], "remote_host": "spex"})
+    fb_groups.fetch(cfg)
+    cfg_local = SimpleNamespace(offer="rent", fb_groups={"groups": ["g"], "queries": ["q"]})
+    fb_groups.fetch(cfg_local)
+    assert calls == ["remote", "local"]
+
+
+def test_errors_without_posts_raise_but_partial_result_survives(monkeypatch):
+    """Одна упавшая группа не должна отменять находки остальных."""
+    from listing_monitor.sources import fb_groups
+
+    good = ('{"posts": [{"text": "CHO THUÊ NHÀ NGUYÊN CĂN 2 PHÒNG NGỦ giá 8 triệu/tháng tại Phú Quốc", '
+            '"url": "https://www.facebook.com/photo/?fbid=1", "group": "g"}], '
+            '"errors": [{"group": "g2", "error": "TimeoutError"}]}')
+    monkeypatch.setattr(fb_groups, "_run_local", lambda g: good)
+    cfg = SimpleNamespace(offer="rent", fb_groups={"groups": ["g"], "queries": ["q"]})
+    assert len(fb_groups.fetch(cfg)) == 1
+
+    monkeypatch.setattr(fb_groups, "_run_local", lambda g: '{"posts": [], "errors": [{"error": "Pages can\'t"}]}')
+    with pytest.raises(RuntimeError):
+        fb_groups.fetch(cfg)

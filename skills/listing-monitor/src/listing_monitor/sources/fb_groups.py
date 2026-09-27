@@ -4,9 +4,15 @@
 конкретных групп. В группах живёт то, чего в Marketplace нет: аренда от
 хозяев, распродажи оборудования при закрытии заведений, объявления сообществ.
 
-Сбор выполняет `scripts/fb_group_search.py` через локальный залогиненный Chrome
-(мост из скилла browser-scout), потому что удалённый `fb_marketplace.py` на
-хосте отсутствует, а групповой поиск всё равно требует живой сессии.
+Сбор идёт одним из двух путей, селекторы у них общие (`listing_monitor.fb_dom`):
+
+* задан `remote_host` — скрипт выполняется на сервере с постоянно залогиненным
+  Chrome (playwright по CDP). Проход не зависит от того, открыт ли браузер на
+  ноутбуке и не спит ли он; так работает и источник `facebook`;
+* иначе — локальный Chrome через мост из скилла browser-scout.
+
+В обоих случаях нужен **личный профиль**: Страница в группы не ходит, Facebook
+отвечает `Pages can't use Marketplace`.
 """
 from __future__ import annotations
 
@@ -17,10 +23,15 @@ import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+from .. import fb_dom
 from ..models import Listing
 from ..parse import is_offer, parse_bedrooms, parse_price_vnd
+from ..remote import put_file, remote_path, run_detached
 
-SCRIPT = Path(__file__).resolve().parents[3] / 'scripts' / 'fb_group_search.py'
+SCRIPTS = Path(__file__).resolve().parents[3] / 'scripts'
+SCRIPT = SCRIPTS / 'fb_group_search.py'
+REMOTE_SCRIPT = SCRIPTS / 'fb_group_search_remote.py'
+REMOTE_DIR = '/tmp/listing-monitor'
 
 # «3 giờ», «Hôm qua», «2 ngày» — грубая оценка свежести из выдачи Facebook
 _UNITS = {'phút': 'minutes', 'giờ': 'hours', 'ngày': 'days', 'tuần': 'weeks'}
@@ -65,8 +76,7 @@ def parse(payload: dict, offer: str = 'rent', now: datetime | None = None) -> li
     return out
 
 
-def fetch(cfg, since=None) -> list[Listing]:
-    g = cfg.fb_groups
+def _run_local(g: dict) -> str:
     cmd = (f'{sys.executable} {shlex.quote(str(SCRIPT))} '
            f'--groups {shlex.quote(",".join(g["groups"]))} '
            f'--queries {shlex.quote(",".join(g["queries"]))} '
@@ -75,11 +85,35 @@ def fetch(cfg, since=None) -> list[Listing]:
                          timeout=g.get('timeout_sec', 900))
     if res.returncode != 0:
         raise RuntimeError(f'fb_group_search упал: {res.stderr.strip()[:200]}')
-    data = json.loads(res.stdout[res.stdout.find('{'):]) if '{' in res.stdout else {}
-    if data.get('errors'):
-        first = data['errors'][0]
-        if 'Страниц' in first.get('error', '') or 'ineligible' in first.get('error', ''):
-            raise RuntimeError(first['error'])
+    return res.stdout
+
+
+def _run_remote(g: dict) -> str:
+    """Доставляем скрипт и селекторы на хост и запускаем там.
+
+    Скрипт кладётся каждый раз: так на сервере не остаётся версии, отставшей
+    от репозитория, — расхождение вёрстки Facebook и селекторов ищется потом
+    сутками.
+    """
+    host = g['remote_host']
+    dom = {'expand': fb_dom.EXPAND, 'grab': fb_dom.GRAB, 'search_url': fb_dom.SEARCH_URL,
+           'page_profile_error': fb_dom.PAGE_PROFILE_ERROR}
+    put_file(host, REMOTE_SCRIPT.read_text(encoding='utf-8'), f'{REMOTE_DIR}/fb_group_search_remote.py',
+             mkdir=REMOTE_DIR)
+    put_file(host, json.dumps(dom, ensure_ascii=False), f'{REMOTE_DIR}/lm_fb_dom.json')
+    cmd = (f'python3 {remote_path(REMOTE_DIR + "/fb_group_search_remote.py")} '
+           f'--groups {shlex.quote(",".join(g["groups"]))} '
+           f'--queries {shlex.quote(",".join(g["queries"]))} '
+           f'--limit {g.get("limit", 10)}')
+    return run_detached(host, cmd, timeout=g.get('timeout_sec', 900))
+
+
+def fetch(cfg, since=None) -> list[Listing]:
+    g = cfg.fb_groups
+    out = _run_remote(g) if g.get('remote_host') else _run_local(g)
+    data = json.loads(out[out.find('{'):]) if '{' in out else {}
+    if data.get('errors') and not data.get('posts'):
+        raise RuntimeError(data['errors'][0].get('error', 'неизвестная ошибка'))
     items = parse(data, cfg.offer)
     seen: dict[str, Listing] = {}
     for x in items:

@@ -75,7 +75,14 @@ def test_render_unknown_distance_and_pipe(cfg):
     assert row.count("|") == 9            # 8 колонок — «|» из заголовка экранирован
 
 
-def test_message_group_then_post_and_no_internal_noise(cfg):
+def test_message_post_then_group_and_no_internal_noise(cfg):
+    """Сначала ссылка на само объявление, группа — справочно.
+
+    Раньше первой шла группа: считалось, что пост откроется только после
+    вступления. Проверка 27.09.2026 показала обратное — все пять групп
+    рассылки открытые, пост читается сразу. Человеку нужен пост, а не
+    приглашение вступить куда-то.
+    """
     tg = L(source="telegram", url="https://t.me/phuquoc_rent/55", title="Сдам дом 2 спальни", price_vnd=9_000_000,
            group_url="https://t.me/phuquoc_rent", group_name="Фукуок аренда")
     fb = L(source="facebook", url="https://www.facebook.com/marketplace/item/1/",
@@ -83,7 +90,7 @@ def test_message_group_then_post_and_no_internal_noise(cfg):
            price_vnd=18_000_000, bedrooms=3)
     msg = render_message([tg, fb], cfg, stamp="s")
     g, p = msg.index("https://t.me/phuquoc_rent\n"), msg.index("https://t.me/phuquoc_rent/55")
-    assert g < p and "Фукуок аренда" in msg
+    assert p < g and "Фукуок аренда" in msg
     assert "вход в Facebook" in msg
     for noise in ("?", "Kiên Giang", "KingKong", "🏡", "3-BEDROOM"):
         assert noise not in msg, noise

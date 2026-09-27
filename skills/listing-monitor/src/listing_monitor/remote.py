@@ -31,8 +31,10 @@ def run_detached(host: str, cmd: str, timeout: int = 240, lock: str = "/tmp/fb-b
     raise TimeoutError(f"remote job on {host} did not finish in {timeout}s")
 
 
-def put_file(host: str, local_text: str, remote_path: str) -> None:
-    subprocess.run(["ssh", "-o", "ConnectTimeout=10", "-o", "BatchMode=yes", host, f"cat > {shlex.quote(remote_path)}"],
+def put_file(host: str, local_text: str, remote_path: str, mkdir: str | None = None) -> None:
+    pre = f"mkdir -p {shlex.quote(mkdir)} && " if mkdir else ""
+    subprocess.run(["ssh", "-o", "ConnectTimeout=10", "-o", "BatchMode=yes", host,
+                    f"{pre}cat > {shlex.quote(remote_path)}"],
                    input=local_text, text=True, check=True, timeout=30, capture_output=True)
 
 
