@@ -237,3 +237,17 @@ def test_errors_without_posts_raise_but_partial_result_survives(monkeypatch):
     monkeypatch.setattr(fb_groups, "_run_local", lambda g: '{"posts": [], "errors": [{"error": "Pages can\'t"}]}')
     with pytest.raises(RuntimeError):
         fb_groups.fetch(cfg)
+
+
+def test_partial_failure_is_reported_not_swallowed(monkeypatch, capsys):
+    """Половина групп не ответила — объявления отдаём, но в stderr пишем об этом."""
+    from listing_monitor.sources import fb_groups
+
+    payload = ('{"posts": [{"text": "CHO THUÊ NHÀ NGUYÊN CĂN 2 PHÒNG NGỦ giá 8 triệu/tháng Phú Quốc", '
+               '"url": "https://www.facebook.com/photo/?fbid=1"}], '
+               '"errors": [{"group": "g2", "query": "q", "error": "TimeoutError: 45000ms exceeded"}]}')
+    monkeypatch.setattr(fb_groups, "_run_local", lambda g: payload)
+    cfg = SimpleNamespace(offer="rent", fb_groups={"groups": ["g1", "g2"], "queries": ["q"]})
+
+    assert len(fb_groups.fetch(cfg)) == 1
+    assert "1 из 2 пар не ответили" in capsys.readouterr().err

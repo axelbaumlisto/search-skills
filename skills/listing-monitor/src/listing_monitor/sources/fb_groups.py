@@ -112,8 +112,15 @@ def fetch(cfg, since=None) -> list[Listing]:
     g = cfg.fb_groups
     out = _run_remote(g) if g.get('remote_host') else _run_local(g)
     data = json.loads(out[out.find('{'):]) if '{' in out else {}
-    if data.get('errors') and not data.get('posts'):
-        raise RuntimeError(data['errors'][0].get('error', 'неизвестная ошибка'))
+    errors = data.get('errors') or []
+    if errors and not data.get('posts'):
+        raise RuntimeError(errors[0].get('error', 'неизвестная ошибка'))
+    if errors:
+        # Часть пар «группа × запрос» отвалилась, остальные принесли объявления.
+        # Молчать нельзя: со стороны это неотличимо от «в группах пусто».
+        fetch.last_errors = errors
+        print(f'fb_groups: {len(errors)} из {len(g["groups"]) * len(g["queries"])} '
+              f'пар не ответили ({errors[0].get("error", "")[:60]})', file=sys.stderr)
     items = parse(data, cfg.offer)
     seen: dict[str, Listing] = {}
     for x in items:
