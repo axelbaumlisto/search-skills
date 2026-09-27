@@ -1,7 +1,7 @@
 ---
 name: listing-monitor
 description: Watch Vietnamese classifieds for any category in any city — houses for rent, used bicycles, motorbikes, anything on Chợ Tốt, Facebook Marketplace, Telegram chats and muaban.net — keep only new listings that match price, keywords, city (and bedrooms for housing), log them to markdown and send them to a Telegram contact. Use when the user wants to find something second-hand or to rent and keep getting fresh offers — "следи за объявлениями", "присылай новые", "мониторинг аренды", "найди б/у велосипед и следи", "watch listings".
-compatibility: uv; an ssh host with a logged-in Chrome on CDP :9222 and the fb-marketplace skill (Facebook, muaban); authorized Telethon sessions and TG_API_ID/TG_API_HASH (env, env_file in the config, or ~/.config/search-skills/.env)
+compatibility: uv; an ssh host with a logged-in Chrome on CDP :9222 and the fb-marketplace skill (Facebook Marketplace, muaban, Facebook groups) — the Facebook session must be a personal profile, not a Page; groups can also run through a local Chrome via the remote-browser skill; authorized Telethon sessions and TG_API_ID/TG_API_HASH (env, env_file in the config, or ~/.config/search-skills/.env)
 ---
 
 # Listing monitor
@@ -33,7 +33,8 @@ those listings now, but the pass never reaches them again. 27.09.2026 that hid
 11 matching houses, four of them at 5–6M — cheaper than anything sent before.
 
 `--recheck` clears "seen" for everything that was never **sent**, so the next
-pass judges it with the current rules. Sent listings stay sent: nobody gets the
+pass judges it with the current rules. Combined with `--dry-run` it only reports
+how many it *would* free and writes nothing. Sent listings stay sent: nobody gets the
 same house twice. Run it whenever you change parsing, filters or price ranges.
 
 ## New search = new config
@@ -57,8 +58,10 @@ Message format — no internal fields (no "?", no province, no unknown distance)
 `N) 9 млн/мес · 2 спальни · <title without emoji> · <district if specific>` (sale: no "/мес", no
 bedrooms). A Facebook price written in thousands ("₫10,500") is shown as
 `~10,5 млн (в объявлении «₫10,500»)` unless the card text states it. Then links:
-posts from a group/chat → group link first ("вступить, чтобы открыть пост"), post link
-under it; Facebook Marketplace → one link marked "нужен вход в Facebook"
+posts from a group/chat → the **post link first**, the group link under it for
+context (the five Phú Quốc groups are public — reading a post needs no join;
+when Facebook exposes no post link at all, a single line says to search inside
+the group); Facebook Marketplace → one link marked "нужен вход в Facebook"
 (Marketplace items are not group posts — there is no group to join).
 
 ## Sources
@@ -67,7 +70,15 @@ under it; Facebook Marketplace → one link marked "нужен вход в Faceb
 |---|---|---|
 | chotot | public API `gateway.chotot.com`, `area_v2` | rent = `type u`; small volume in Phu Quoc |
 | facebook | `fb_marketplace.py` on the ssh host, geo search | geo leaks other cities → `exclude_keywords`; card details for up to `max_details` items |
-| fb_groups | posts **inside groups**, via the local logged-in Chrome (`scripts/fb_group_search.py`) | needs a **personal** profile — a Page gets `Pages can't use Marketplace`; ~10 s per group×query pair; no Marketplace overlap |
+| fb_groups | posts **inside groups**, on the ssh host or the local Chrome (`scripts/fb_group_search*.py`) | needs a **personal** profile — a Page gets `Pages can't use Marketplace`; ~12 s per group×query pair; no Marketplace overlap |
+| telegram | Telethon `SearchGlobalRequest` from the research session | only chats with a public username (link needed) |
+| muaban | Playwright on the ssh host's Chrome | province page, filtered by city keywords |
+
+A failing source is reported in the stats line and does not stop the others.
+Remote browser jobs are serialised with `/tmp/fb-browser.lock` (shared with
+the marketplace-search / browser-scout skills). A source that returns *some*
+results despite failures prints `fb_groups: 1 из 15 пар не ответили (…)` to
+stderr — partial degradation is otherwise indistinguishable from an empty market.
 
 ### fb_groups — what it takes to work
 
@@ -106,12 +117,7 @@ house in Đà Lạt was delivered as a Phú Quốc match. With `verify_city = tr
 the card is read to confirm the city; unconfirmed listings lose their geo flag
 and have to prove the city by text like any other source. Costs ~45 s per card,
 so it is off by default.
-| telegram | Telethon `SearchGlobalRequest` from the research session | only chats with a public username (link needed) |
-| muaban | Playwright on the ssh host's Chrome | province page, filtered by city keywords |
 
-A failing source is reported in the stats line and does not stop the others.
-Remote browser jobs are serialised with `/tmp/fb-browser.lock` (shared with
-the marketplace-search / browser-scout skills).
 
 ## Schedule
 
@@ -170,11 +176,13 @@ Pipeline and CLI need no changes.
 | `facebook` returns only `RUNNING` / empty | wrong `remote_script` path on the host |
 | `telegram: ошибка … not authorized` | session expired — log in again with Telethon for that session file |
 | `muaban: 0` | page layout changed — check `REMOTE_SCRIPT` selector in `sources/muaban.py` |
-| same listing sent twice | its URL changed; `state.json` keys on URL |
+| same listing sent twice | its text differs by more than the first 14 words, or it is shorter than 10 words (then only the URL is compared) — see `store._fingerprint` |
+| the same house arrives from three groups | expected before 27.09.2026; now collapsed by text+price fingerprint |
 | scheduled run did nothing | read its log; `launchctl print gui/$(id -u)/<label>` shows last exit code |
 | fixed the parser, still nothing arrives | those listings are already in `seen` — run `refresh --recheck` once |
 | `fb_groups` errors with `ineligible` | Facebook is acting as a **Page**; switch to the personal profile (avatar → Switch profile) |
-| `fb_groups` mostly "no price" | posts were not expanded: the `See more` click in `scripts/fb_group_search.py` broke with a layout change |
+| `fb_groups` mostly "no price" | posts were not expanded: the `See more` click in `listing_monitor/fb_dom.py` broke with a layout change |
+| `fb_groups` returns far fewer posts than usual | read stderr: pairs time out individually. Page timeout is 75 s with one retry and an overall `--budget-sec`; raise `timeout_sec` if the host is slow |
 | a sale ad arrives in a rent search | Marketplace does not tag the deal type; the text filter catches `bán/продам` — widen `_OFFER` in `parse.py` if a new wording slips through |
 | a nightly rate looks like a monthly price | `₫7,500` from the FB field is multiplied by 1000; the message shows the original in brackets — trust the brackets |
 
@@ -190,11 +198,13 @@ src/listing_monitor/
   store.py      State: seen / sent / last_run (JSON)
   report.py     markdown section + Telegram message
   pipeline.py   refresh(): collect -> new -> enrich -> filter -> log -> send
-  sources/      __init__ (REGISTRY) · chotot · facebook · telegram · muaban
-  remote.py     detached ssh jobs with flock on the shared browser
+  sources/      __init__ (REGISTRY) · chotot · facebook · fb_groups · telegram · muaban
+  fb_dom.py     Facebook group DOM: expand "See more", grab post + photo link (shared by both transports)
+  remote.py     detached ssh jobs with flock on the shared browser; put_file ships scripts to the host
   tg.py         Telethon client, TG_API_ID/HASH from env / env_file / ~/.config/search-skills/.env
   notify.py     send message to cfg.notify.peer_id
   cli.py        refresh | check | seed
+scripts/        fb_group_search.py (local Chrome) · fb_group_search_remote.py (host, playwright over CDP)
 tests/          offline tests on saved real responses (tests/fixtures/)
 configs/        example searches (*.example.toml); real ones live outside the repo
 ```
