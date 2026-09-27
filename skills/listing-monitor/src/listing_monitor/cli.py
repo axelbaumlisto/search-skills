@@ -22,6 +22,8 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--no-send", action="store_true")
     p.add_argument("--days", type=int, help="refresh: окно в днях вместо «с прошлого запуска»")
     p.add_argument("--from", dest="src", help="seed: файл, все URL из которого считать виденными")
+    p.add_argument("--recheck", action="store_true",
+                   help="refresh: заново оценить виденные, но не отправленные — после починки парсера или смены критериев")
     a = p.parse_args(argv)
     cfg = load_config(a.config)
 
@@ -42,6 +44,16 @@ def main(argv: list[str] | None = None) -> int:
                 ok = False
                 print(f"{name}: FAIL {type(e).__name__}: {e}")
         return 0 if ok else 1
+
+    if a.recheck:
+        # Починили парсер — и находки не придут: они уже помечены виденными.
+        # Снимаем пометку с виденных, но НЕ отправленных: отправленное повторно не шлём.
+        st = State.load(cfg.state_path)
+        before = len(st.seen)
+        st.seen = set(st.seen) & set(st.sent)
+        st.save()
+        print(f"recheck: снято «виденное» с {before - len(st.seen)} объявлений, "
+              f"отправленные {len(st.sent)} не тронуты")
 
     send = None
     if not (a.no_send or a.dry_run) and cfg.notify:

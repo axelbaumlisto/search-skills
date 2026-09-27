@@ -38,11 +38,24 @@ def parse_search(payload: dict) -> list[Listing]:
     return out
 
 
-def apply_detail(x: Listing, d: dict) -> Listing:
+def city_confirmed(cfg, *parts: str) -> bool:
+    """Город подтверждён текстом карточки, а не гео-фильтром Facebook.
+
+    «Listed in Phú Quốc» в выдаче — это место ПРОДАВЦА. 26.09.2026 так уехал
+    дом в Далате: в заголовке города нет, в описании «Đà Lạt, Phường 4».
+    """
+    blob = " ".join(p or "" for p in parts).lower()
+    if any(k in blob for k in cfg.exclude_keywords):
+        return False
+    return any(k in blob for k in cfg.city_keywords)
+
+
+def apply_detail(x: Listing, d: dict, cfg=None) -> Listing:
     text = f"{d.get('title') or x.title}\n{d.get('description') or ''}"
     exact = parse_price_vnd(d.get("description") or "")
     price, note = (exact, "") if exact and (x.price_vnd is None or x.price_note) else (x.price_vnd or _price(d.get("price"), text), x.price_note)
-    return replace(x, text=text, price_vnd=price, price_note=note,
+    geo = x.geo_bound if cfg is None else city_confirmed(cfg, text, d.get("location"))
+    return replace(x, text=text, price_vnd=price, price_note=note, geo_bound=geo,
                    bedrooms=x.bedrooms or parse_bedrooms(text), contact=d.get("seller") or x.contact,
                    area=d.get("location") or x.area)
 
@@ -78,10 +91,19 @@ def enrich(cfg, items: list[Listing]) -> list[Listing]:
     limit = cfg.facebook.get("max_details", 5)
     out, done = [], 0
     for x in items:
-        need = x.price_vnd is None or x.price_note or (cfg.min_bedrooms and x.bedrooms is None)
+        # Гео Facebook — это место ПРОДАВЦА, не объекта. С verify_city = true
+        # карточка дочитывается ради города и неподтверждённые не уходят за свой.
+        # По умолчанию выключено: чтение карточки стоит ~45 с.
+        unverified = cfg.facebook.get("verify_city") and not city_confirmed(cfg, x.title, x.text)
+        need = x.price_vnd is None or x.price_note or (cfg.min_bedrooms and x.bedrooms is None) or unverified
         if done < limit and need:
             item_id = x.url.rstrip("/").rsplit("/", 1)[-1]
-            x = apply_detail(x, _run(cfg, f"detail --item-id {item_id}"))
+            try:
+                x = apply_detail(x, _run(cfg, f"detail --item-id {item_id}"), cfg)
+            except Exception:        # таймаут ssh или занятый браузер — не повод терять объявление
+                x = replace(x, geo_bound=False) if unverified else x
             done += 1
+        elif unverified:
+            x = replace(x, geo_bound=False)      # не подтвердили — не выдаём за свой город
         out.append(x)
     return out

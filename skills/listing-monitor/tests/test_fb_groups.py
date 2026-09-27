@@ -1,0 +1,163 @@
+"""Разбор постов групп Facebook — оффлайн, на зафиксированной выдаче."""
+from datetime import datetime, timezone
+
+from listing_monitor.sources import fb_groups
+
+NOW = datetime(2026, 9, 26, 12, 0, tzinfo=timezone.utc)
+
+PAYLOAD = {
+    "posts": [
+        {   # обычное предложение аренды с ценой и спальнями
+            "group": "phuquocrent", "group_url": "https://www.facebook.com/groups/phuquocrent",
+            "url": "https://www.facebook.com/groups/phuquocrent/posts/123/",
+            "author": "Minh Anh", "time": "3 giờ",
+            "text": "Cho thuê nhà nguyên căn 2 phòng ngủ tại Dương Đông, giá 9 triệu/tháng, có máy lạnh",
+        },
+        {   # спрос, а не предложение — должен отсеяться
+            "group": "phuquocrent", "group_url": "https://www.facebook.com/groups/phuquocrent",
+            "url": "", "author": "Lan", "time": "Hôm qua",
+            "text": "Cần thuê nhà 2 phòng ngủ khu vực Dương Đông, ngân sách 8 triệu, ai có nhà báo mình nhé",
+        },
+        {   # без постоянной ссылки — падаем на ссылку группы, пост не теряем
+            "group": "thanhlydocudn", "group_url": "https://www.facebook.com/groups/thanhlydocudn",
+            "url": "https://www.facebook.com/groups/thanhlydocudn",
+            "author": "Hùng", "time": "2 ngày",
+            "text": "Thanh lý tủ mát 2 cánh còn bảo hành, giá 6.500.000đ, quán đóng cửa nên pass gấp",
+        },
+    ],
+    "errors": [],
+}
+
+
+def test_offer_only():
+    items = fb_groups.parse(PAYLOAD, offer="rent", now=NOW)
+    assert len(items) == 1, [x.title for x in items]      # спрос и распродажа мебели — не аренда
+    x = items[0]
+    assert x.source == "fb_groups"
+    assert x.price_vnd == 9_000_000
+    assert x.bedrooms == 2
+    assert x.contact == "Minh Anh"
+    assert x.group_url.endswith("/groups/phuquocrent")
+    assert x.geo_bound is True
+
+
+def test_time_parsing():
+    assert fb_groups.parse_time("3 giờ", NOW).hour == 9
+    assert fb_groups.parse_time("2 ngày", NOW).day == 24
+    assert fb_groups.parse_time("Hôm qua", NOW).day == 25
+    assert fb_groups.parse_time("", NOW) is None
+    assert fb_groups.parse_time("недавно", NOW) is None
+
+
+def test_url_fallback_keeps_post():
+    """Пост без permalink не должен теряться: ссылка на группу лучше, чем ничего."""
+    sale = dict(PAYLOAD)
+    items = fb_groups.parse(sale, offer="sale", now=NOW)
+    urls = [x.url for x in items]
+    assert any(u.endswith("/groups/thanhlydocudn") for u in urls), urls
+
+
+# --- проверка города в Marketplace (баг 26.09.2026: дом из Далата ушёл как Фукуок) ---
+
+def test_facebook_verify_city(monkeypatch):
+    """С verify_city карточка дочитывается, и чужой город теряет гео-подтверждение."""
+    from listing_monitor.sources import facebook
+    from listing_monitor.config import Config
+    from listing_monitor.models import Listing
+
+    cfg = Config(name="t", max_price_vnd=20_000_000, min_bedrooms=2,
+                 city_keywords=["phú quốc", "phu quoc"], exclude_keywords=["đà lạt"],
+                 facebook={"max_details": 5, "verify_city": True})
+    details = {"1": {"description": "Cho thuê nhà 2 phòng ngủ Phú Quốc, 9 triệu"},
+               "2": {"description": "CHO THUÊ NHÀ 2 PHÒNG NGỦ khu vực Phường 4, Đà Lạt, 8 triệu"}}
+    monkeypatch.setattr(facebook, "_run",
+                        lambda c, a: details[a.rsplit(" ", 1)[-1]])
+
+    items = [Listing(source="facebook", url="https://f/item/1/", title="2 phòng ngủ Nhà",
+                     text="2 phòng ngủ Nhà", price_vnd=9_000_000, bedrooms=2, geo_bound=True),
+             Listing(source="facebook", url="https://f/item/2/", title="2 phòng ngủ 3 phòng tắm Nhà",
+                     text="2 phòng ngủ 3 phòng tắm Nhà", price_vnd=8_000_000, bedrooms=2, geo_bound=True)]
+    out = {x.url: x for x in facebook.enrich(cfg, items)}
+    assert out["https://f/item/1/"].geo_bound is True      # Фукуок подтверждён описанием
+    assert out["https://f/item/2/"].geo_bound is False     # Далат — не наш город
+
+
+def test_facebook_without_verify_city_does_not_fetch(monkeypatch):
+    """Без флага поведение прежнее: карточка только ради цены и спален."""
+    from listing_monitor.sources import facebook
+    from listing_monitor.config import Config
+    from listing_monitor.models import Listing
+
+    cfg = Config(name="t", max_price_vnd=20_000_000, city_keywords=["phú quốc"], facebook={"max_details": 5})
+    calls = []
+    monkeypatch.setattr(facebook, "_run", lambda c, a: calls.append(a) or {"description": "giá 5tr"})
+    facebook.enrich(cfg, [Listing(source="facebook", url="https://f/item/9/", title="Nhà",
+                                  text="Nhà", price_vnd=5_000_000, geo_bound=True)])
+    assert calls == []
+
+
+# --- посуточная/туристическая сдача: брак прохода 26.09.2026 ---
+
+def test_daily_rental_catches_short_term_wording():
+    from listing_monitor.parse import is_daily_rental
+    # то, на чём фильтр сломался: вилла 5 спален, «7,5 млн», цена только в поле FB
+    assert is_daily_rental("Вилла подходит как для короткого, так и для длительного проживания")
+    assert is_daily_rental("Suitable for short-term and long-term stay")
+    assert is_daily_rental("cho thuê ngắn hạn và dài hạn")
+    # обычная долгая аренда мимо фильтра не проходит
+    assert not is_daily_rental("Cho thuê nhà nguyên căn 2 phòng ngủ, hợp đồng 12 tháng")
+    assert not is_daily_rental("Дом в долгую аренду, договор от года")
+
+
+def test_sale_listing_rejected_in_rent_monitor():
+    """«Bán căn hộ» приезжал из Marketplace в мониторинг аренды (замер 27.09.2026)."""
+    from listing_monitor.config import Config
+    from listing_monitor.filters import matches
+    from listing_monitor.models import Listing
+
+    cfg = Config(name="t", max_price_vnd=20_000_000, min_price_vnd=1_000_000,
+                 min_bedrooms=2, city_keywords=["phú quốc"], offer="rent")
+    sale = Listing(source="facebook", url="u1", title="Bán căn hộ biển 2 phòng ngủ hướng biển Hillside",
+                   text="Bán căn hộ biển 2 phòng ngủ hướng biển Hillside Phú Quốc",
+                   price_vnd=7_200_000, bedrooms=2, geo_bound=True)
+    rent = Listing(source="facebook", url="u2", title="Cho thuê nhà 2 phòng ngủ Phú Quốc",
+                   text="Cho thuê nhà nguyên căn 2 phòng ngủ Phú Quốc, 7 triệu/tháng",
+                   price_vnd=7_000_000, bedrooms=2, geo_bound=True)
+    assert matches(sale, cfg) == (False, "другой тип сделки")
+    assert matches(rent, cfg)[0] is True
+
+
+def test_recheck_frees_seen_but_keeps_sent(tmp_path):
+    """--recheck возвращает в оборот виденное, но не трогает отправленное."""
+    import json
+    from listing_monitor.store import State
+
+    p = tmp_path / "state.json"
+    p.write_text(json.dumps({"seen": ["a", "b", "c"], "sent": ["b"]}))
+    st = State.load(p)
+    st.seen = set(st.seen) & set(st.sent)      # то, что делает --recheck
+    st.save()
+
+    after = json.loads(p.read_text())
+    assert after["seen"] == ["b"]              # a и c снова будут оценены
+    assert after["sent"] == ["b"]              # b повторно не отправится
+
+
+def test_links_group_and_post():
+    """Человеку нужны обе ссылки: группа (вступить) и сам пост."""
+    from listing_monitor.report import _links
+    from listing_monitor.models import Listing
+
+    x = Listing(source="fb_groups", url="https://www.facebook.com/photo/?fbid=1&set=pcb.2",
+                title="t", text="t", group_url="https://www.facebook.com/groups/g",
+                group_name="Phu Quoc Rent")
+    out = _links(x)
+    assert len(out) == 2
+    assert "Группа «Phu Quoc Rent»" in out[0] and out[0].endswith("/groups/g")
+    assert out[1].endswith("fbid=1&set=pcb.2")
+
+    # ссылки на пост нет — вторую строку не печатаем, но объясняем, что делать
+    y = Listing(source="fb_groups", url="https://www.facebook.com/groups/g", title="t", text="t",
+                group_url="https://www.facebook.com/groups/g", group_name="Phu Quoc Rent")
+    out2 = _links(y)
+    assert len(out2) == 1 and "найти пост поиском внутри группы" in out2[0]

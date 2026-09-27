@@ -7,7 +7,7 @@ from datetime import datetime
 
 @dataclass
 class Listing:
-    source: str                     # chotot | facebook | telegram | muaban
+    source: str                     # chotot | facebook | fb_groups | telegram | muaban
     url: str                        # ключ уникальности
     title: str
     text: str = ""

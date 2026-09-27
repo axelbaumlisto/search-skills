@@ -33,7 +33,13 @@ def default_enrich(cfg: Config, items: list[Listing]) -> list[Listing]:
     out = []
     for name, mod in enabled(cfg).items():
         mine = [x for x in items if x.source == name]
-        out += mod.enrich(cfg, mine) if mine and hasattr(mod, "enrich") else mine
+        if not mine or not hasattr(mod, "enrich"):
+            out += mine
+            continue
+        try:
+            out += mod.enrich(cfg, mine)
+        except Exception:            # карточки — необязательная роскошь: упало, значит идём без них
+            out += mine
     return out + [x for x in items if x.source not in enabled(cfg)]
 
 

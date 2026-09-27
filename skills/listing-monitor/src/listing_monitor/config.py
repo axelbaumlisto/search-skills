@@ -19,6 +19,7 @@ class Config:
     center: dict = field(default_factory=dict)
     chotot: dict = field(default_factory=dict)
     facebook: dict = field(default_factory=dict)
+    fb_groups: dict = field(default_factory=dict)   # посты групп: {groups, queries, limit}
     telegram: dict = field(default_factory=dict)
     muaban: dict = field(default_factory=dict)
     notify: dict = field(default_factory=dict)

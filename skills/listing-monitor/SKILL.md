@@ -21,8 +21,20 @@ uv run --project $S listing-monitor refresh --config my-search.toml             
 uv run --project $S listing-monitor refresh --config ... --no-send                       # log only
 uv run --project $S listing-monitor refresh --config ... --dry-run --days 30             # new search: whole current market
 uv run --project $S listing-monitor seed    --config ... --from old_report.md            # mark URLs as seen
+uv run --project $S listing-monitor refresh --config ... --recheck                       # re-judge everything not yet sent
 uv run --project $S pytest -q                                                            # tests (offline)
 ```
+
+### `--recheck` — after you fix a parser
+
+State remembers every listing it has ever **seen**, not just the sent ones. So a
+parser fix does nothing for what is already in the state: the filter would pass
+those listings now, but the pass never reaches them again. 27.09.2026 that hid
+11 matching houses, four of them at 5–6M — cheaper than anything sent before.
+
+`--recheck` clears "seen" for everything that was never **sent**, so the next
+pass judges it with the current rules. Sent listings stay sent: nobody gets the
+same house twice. Run it whenever you change parsing, filters or price ranges.
 
 ## New search = new config
 
@@ -55,6 +67,36 @@ under it; Facebook Marketplace → one link marked "нужен вход в Faceb
 |---|---|---|
 | chotot | public API `gateway.chotot.com`, `area_v2` | rent = `type u`; small volume in Phu Quoc |
 | facebook | `fb_marketplace.py` on the ssh host, geo search | geo leaks other cities → `exclude_keywords`; card details for up to `max_details` items |
+| fb_groups | posts **inside groups**, via the local logged-in Chrome (`scripts/fb_group_search.py`) | needs a **personal** profile — a Page gets `Pages can't use Marketplace`; ~10 s per group×query pair; no Marketplace overlap |
+
+### fb_groups — what it takes to work
+
+```toml
+[fb_groups]
+groups  = ["472474987298531", "congdongphuquocnew"]   # id or slug from /groups/<here>
+queries = ["nhà nguyên căn", "cho thuê nhà 2 phòng ngủ"]
+limit = 8            # posts per group×query pair
+timeout_sec = 1200   # whole sweep
+```
+
+- **Personal Facebook profile only.** Under a Page every group URL redirects to
+  `/marketplace/ineligible/`; the source fails loudly instead of returning zero.
+- **Posts are expanded before reading.** Facebook collapses long text behind
+  "See more" and Vietnamese sellers put the price at the end — without the
+  click 23 of 31 posts were dropped as "no price". After it: 26 of 31 priced.
+- **Search returns a different slice every run.** The same group answers with
+  another subset minutes later, so a listing may surface a pass or two later.
+  Do not treat one empty pass as "nothing there".
+- **Deduplicate by text, not URL.** Group posts often expose only the group
+  link, so several different houses share one URL.
+
+### facebook — `verify_city`
+
+Marketplace geo is the **seller's** city, not the property's. On 26.09.2026 a
+house in Đà Lạt was delivered as a Phú Quốc match. With `verify_city = true`
+the card is read to confirm the city; unconfirmed listings lose their geo flag
+and have to prove the city by text like any other source. Costs ~45 s per card,
+so it is off by default.
 | telegram | Telethon `SearchGlobalRequest` from the research session | only chats with a public username (link needed) |
 | muaban | Playwright on the ssh host's Chrome | province page, filtered by city keywords |
 
@@ -93,6 +135,8 @@ Linux: `0 */6 * * * uv run --project ... listing-monitor refresh --config ...` i
 | `[districts]` `"name" = [lat, lng]` | optional district table: text mention → coordinates → distance |
 | `[chotot]` `categories`, `area_v2` or `region_v2` | Chợ Tốt codes: cg 1000 real estate, 2060 bicycles, 2020 motorbikes; region 3017 Đà Nẵng, 13000 HCMC; area 503112 Phú Quốc |
 | `[facebook]` `queries`, `city` or `lat/lng/radius_km`, `limit`, `max_details`, `remote_host`, `remote_script` | geo search on the ssh host (`city` = fb_marketplace.py preset); `max_details` = card reads per run (~45 s each), only for items missing a price (or bedrooms, if required) |
+| `[fb_groups]` `groups`, `queries`, `limit`, `timeout_sec` | posts inside Facebook groups via the local Chrome; ids or slugs from `/groups/<here>` |
+| `[facebook]` `verify_city` | read the card to confirm the city; Marketplace geo is the seller's city, not the property's |
 | `[telegram]` `session`, `queries`, `chats` | research account session; short query stems work best; `chats` = allowlist of city chats, their posts count as the right city |
 | `[muaban]` `urls`, `remote_host` | category pages of a province (cho-thue-nha-dat-…, xe-dap-…) |
 | `[notify]` `session`, `peer_id` | who receives new matches (personal account) |
@@ -119,6 +163,11 @@ Pipeline and CLI need no changes.
 | `muaban: 0` | page layout changed — check `REMOTE_SCRIPT` selector in `sources/muaban.py` |
 | same listing sent twice | its URL changed; `state.json` keys on URL |
 | scheduled run did nothing | read its log; `launchctl print gui/$(id -u)/<label>` shows last exit code |
+| fixed the parser, still nothing arrives | those listings are already in `seen` — run `refresh --recheck` once |
+| `fb_groups` errors with `ineligible` | Facebook is acting as a **Page**; switch to the personal profile (avatar → Switch profile) |
+| `fb_groups` mostly "no price" | posts were not expanded: the `See more` click in `scripts/fb_group_search.py` broke with a layout change |
+| a sale ad arrives in a rent search | Marketplace does not tag the deal type; the text filter catches `bán/продам` — widen `_OFFER` in `parse.py` if a new wording slips through |
+| a nightly rate looks like a monthly price | `₫7,500` from the FB field is multiplied by 1000; the message shows the original in brackets — trust the brackets |
 
 ## Layout
 

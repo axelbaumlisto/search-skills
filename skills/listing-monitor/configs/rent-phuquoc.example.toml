@@ -74,3 +74,12 @@ peer_id = "username_or_numeric_id"   # recipient
 [paths]
 state = "state.json"
 master = "rentals.md"
+
+# Посты групп Facebook: то, чего нет в Marketplace — аренда от хозяев,
+# объявления сообществ. Работает через локальный залогиненный Chrome
+# (scripts/fb_group_search.py), аккаунт должен быть ЛИЧНЫМ, не Страницей.
+[fb_groups]
+groups = ["phuquocrent", "1456487654963956"]   # id или слаг из ссылки /groups/<тут>
+queries = ["cho thuê nhà", "nhà nguyên căn", "cho thuê villa"]
+limit = 10           # постов на пару «группа × запрос»
+timeout_sec = 900    # весь проход: ~10 с на пару, с запасом

@@ -54,7 +54,12 @@ def is_offer(text: str, offer: str = "rent") -> bool:
     return not _SEEKING[offer].search(t[:200]) and bool(_OFFER[offer].search(t))
 
 
-_DAILY = re.compile(r"homestay|/\s*(đêm|ngày|night|сутки|ночь)|theo ngày|per night|посуточно|за ночь")
+_DAILY = re.compile(
+    r"homestay|/\s*(đêm|ngày|night|сутки|ночь)|theo ngày|per night|посуточно|за ночь"
+    # туристическая сдача: пишут «и коротко, и длительно» — для семьи это не вариант,
+    # а цена в таких объявлениях обычно за ночь (26.09.2026: вилла 5 спален «за 7,5 млн»)
+    r"|корот(кого|кий срок|кие сроки)|short[- ]?term|short stay|ngắn hạn|theo tuần|по неделям"
+)
 
 
 def is_daily_rental(text: str) -> bool:

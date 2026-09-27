@@ -57,6 +57,11 @@ def _where(x: Listing, cfg: Config) -> str:
 def _links(x: Listing) -> list[str]:
     if x.group_url:
         name = f"«{x.group_name}» " if x.group_name else ""
+        # Ссылка на пост бывает недоступна: в выдаче Facebook вырезает permalink,
+        # и остаётся только группа. Тогда строку «Пост» не печатаем — пустая
+        # ссылка на ту же группу выглядит как ошибка.
+        if not x.url or x.url == x.group_url:
+            return [f"   Группа {name}(вступить и найти пост поиском внутри группы): {x.group_url}"]
         return [f"   Группа {name}(вступить, чтобы открыть пост): {x.group_url}", f"   Пост: {x.url}"]
     if "facebook.com/marketplace" in x.url:
         return [f"   Facebook Marketplace (нужен вход в Facebook): {x.url}"]

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from .config import Config
 from .models import Listing
-from .parse import is_daily_rental
+from .parse import is_daily_rental, is_offer
 
 
 def is_placeholder_price(v: int) -> bool:
@@ -20,6 +20,11 @@ def matches(x: Listing, cfg: Config) -> tuple[bool, str]:
         return False, "посуточно"
     if any(k in blob for k in cfg.exclude_keywords):
         return False, "исключено"
+    # Marketplace не размечает тип сделки: «Bán căn hộ 2 phòng ngủ» приезжал
+    # в мониторинг аренды как подходящий (замер 27.09.2026). Явное «продам»
+    # в тексте перевешивает молчание источника.
+    if is_offer(blob, "sale" if cfg.offer == "rent" else "rent") and not is_offer(blob, cfg.offer):
+        return False, "другой тип сделки"
     if cfg.include_any and not any(k in blob for k in cfg.include_any):
         return False, "не та категория"
     if x.price_vnd is None or is_placeholder_price(x.price_vnd):
