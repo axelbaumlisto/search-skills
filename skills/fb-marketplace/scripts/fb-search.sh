@@ -9,7 +9,13 @@
 #   fb-search.sh --health              # is the browser alive and logged in?
 set -uo pipefail
 
-REMOTE=remote-browser
+# Хост с браузером — снаружи: BROWSER_SSH_HOST, либо remoteBrowser.sshHost из
+# SKILLS_CONFIG, иначе generic-имя. Хардкод ломался на любой машине, кроме одной.
+REMOTE="${BROWSER_SSH_HOST:-}"
+if [ -z "$REMOTE" ] && [ -n "${SKILLS_CONFIG:-}" ] && [ -r "${SKILLS_CONFIG/#\~/$HOME}" ]; then
+  REMOTE=$(python3 -c 'import json,os,sys;p=os.path.expanduser(os.environ["SKILLS_CONFIG"]);print(json.load(open(p)).get("remoteBrowser",{}).get("sshHost",""))' 2>/dev/null)
+fi
+REMOTE="${REMOTE:-remote-browser}"
 FB="${FB_REMOTE_SCRIPT:-fb_marketplace.py}"   # путь на удалённом хосте
 TAG="fb-$$"
 OUT="/tmp/$TAG.out"; ERR="/tmp/$TAG.err"

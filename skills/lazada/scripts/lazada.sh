@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Lazada Thailand — история заказов из живого залогиненного Chrome.
+# Lazada — история заказов из живого залогиненного Chrome.
+# Страна: LAZADA_REGION=th (по умолчанию) | vn, либо готовая обёртка lazada-vn.sh.
 #
 #   lazada.sh orders                        # вся история, таблицей
 #   lazada.sh orders --query "touch|จอ"     # только подходящие позиции
@@ -10,6 +11,6 @@
 #   lazada.sh cart --remove 2               # убрать позицию (номер или слово из названия)
 #   lazada.sh add "<url|pdp-id>" --qty 2    # положить товар в корзину
 #
-# Chrome должен быть запущен и залогинен на lazada.co.th; страница откроется сама.
+# Chrome должен быть запущен и залогинен на lazada.co.th / lazada.vn; страница откроется сама.
 set -euo pipefail
 exec node "$(dirname "$0")/cli.cjs" "$@"

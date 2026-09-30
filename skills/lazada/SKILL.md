@@ -1,12 +1,37 @@
 ---
 name: lazada-search
-description: Read the purchase history of a Lazada Thailand (lazada.co.th) account, search the catalogue, and manage that account's cart — what was ordered, from which shop, for how much, in which state, plus live prices, sold counts, review counts, and adding or removing cart items. Use when the user asks whether they bought something before, wants the price of a past purchase, needs to recall a shop, checks unfinished orders, wants current Thai prices, or wants something put in the cart — "did I buy", "what did I order", "how much did I pay for", "search lazada", "add to cart", "what is in my cart".
+description: Read the purchase history of a Lazada Thailand (lazada.co.th) or Lazada Vietnam (lazada.vn) account, search the catalogue, and manage that account's cart — what was ordered, from which shop, for how much, in which state, plus live prices, sold counts, review counts, and adding or removing cart items. Use when the user asks whether they bought something before, wants the price of a past purchase, needs to recall a shop, checks unfinished orders, wants current Thai prices, or wants something put in the cart — "did I buy", "what did I order", "how much did I pay for", "search lazada", "add to cart", "what is in my cart".
 ---
 
-# Lazada Thailand: orders + catalogue search + cart
+# Lazada TH + VN: orders + catalogue search + cart
 
-Reads from the live, logged-in Chrome. Thailand only: one country, so there is no
-region table — a second country means adding the host here, not copying the skill.
+Reads from the live, logged-in Chrome.
+
+**Страна — переменной, не копией скилла.** `LAZADA_REGION=th` (по умолчанию) `| vn`
+выбирает хост, валюту и надписи интерфейса из таблицы `REGIONS` в `lazada.cjs`.
+Готовая обёртка для Вьетнама — `scripts/lazada-vn.sh` (одна строка, тот же код).
+
+```bash
+scripts/lazada.sh search "jo monitor"        # Таиланд, ฿
+scripts/lazada-vn.sh search "vợt bắt muỗi"   # Вьетнам, ₫
+LAZADA_REGION=vn scripts/lazada.sh orders    # то же самое руками
+```
+
+Что отличается между странами и уже учтено:
+
+- цена стоит по разные стороны: `฿168.00` против `168.000 ₫`;
+- разделители другие: у бата точка — копейки, у донга точка — тысячи,
+  поэтому `Number('184.536')` для VN дал бы 184 вместо 184536; парсер числа
+  свой на страну;
+- «N sold» ↔ `N Đã bán`, «Total» ↔ `Tổng cộng`, `(N ITEMS)` ↔ `(N sản phẩm)`;
+- кнопка корзины: `Add to Cart` ↔ `Thêm vào giỏ hàng`, подтверждение удаления
+  `REMOVE` ↔ `XÓA`. Совпадение по **точному** тексту: во вьетнамском «Mua ngay»
+  (купить сразу) стоит рядом, и поиск по подстроке оформит заказ вместо корзины.
+
+Сессии у стран независимые: логин на `lazada.co.th` не даёт доступа к
+`my.lazada.vn` — заказы отдадут редирект на `login-signup`. Владелец логинится
+один раз руками (во Вьетнаме — кнопкой «Login with Google»), дальше кука живёт
+в профиле Chrome.
 
 ## Commands
 

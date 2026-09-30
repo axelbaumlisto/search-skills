@@ -21,13 +21,42 @@ const path = require('path');
 const BRIDGE = path.join(process.env.HOME, '.pi/agent/skills/shopee-search/scripts/bridge.cjs');
 const bridge = require(BRIDGE);
 
-const HOST = 'my.lazada.co.th';
-const SHOP_HOST = 'www.lazada.co.th';
-const CART_HOST = 'cart.lazada.co.th';
+// Страна — одной переменной LAZADA_REGION (th по умолчанию, vn — Вьетнам).
+// Копировать скилл под вторую страну нельзя: отличаются только хост,
+// валюта и слова в интерфейсе, всё остальное у Лазады общее.
+const REGIONS = {
+  th: {
+    host: 'my.lazada.co.th', shop: 'www.lazada.co.th', cart: 'cart.lazada.co.th',
+    cur: '฿',
+    // «1,234.50»: запятая — тысячи, точка — копейки
+    num: (s) => Number(String(s).replace(/[^\d.]/g, '')),
+    sold: /([\d.,]+)\s*(?:sold|ขายแล้ว)/i,
+    addBtn: ['add to cart', 'หยิบใส่ตะกร้า'],
+    added: /added to cart|หยิบใส่ตะกร้าเรียบร้อย/i,
+    confirm: ['remove', 'ลบ', 'ok', 'confirm'],
+  },
+  vn: {
+    host: 'my.lazada.vn', shop: 'www.lazada.vn', cart: 'cart.lazada.vn',
+    cur: '₫',
+    // «184.536»: точка — тысячи, дробной части у донга нет
+    num: (s) => Number(String(s).replace(/[^\d]/g, '')),
+    sold: /([\d.,]+)\s*(?:sold|đã bán)/i,
+    addBtn: ['add to cart', 'thêm vào giỏ hàng', 'mua ngay'],
+    added: /added to cart|đã thêm vào giỏ hàng|thêm vào giỏ hàng thành công/i,
+    confirm: ['remove', 'xóa', 'xoá', 'đồng ý', 'ok', 'confirm'],
+  },
+};
+const REGION = (process.env.LAZADA_REGION || 'th').toLowerCase();
+const R = REGIONS[REGION];
+if (!R) throw new Error(`неизвестный LAZADA_REGION=${REGION}, доступны: ${Object.keys(REGIONS).join(', ')}`);
+
+const HOST = R.host;
+const SHOP_HOST = R.shop;
+const CART_HOST = R.cart;
 const ORDERS_URL = `https://${HOST}/customer/order/index/`;
 const CART_URL = `https://${CART_HOST}/cart`;
 const API = '/customer/api/sync/order-list';
-const CUR = '฿';
+const CUR = R.cur;
 
 const TABS = ['ALL', 'TO_PAY', 'TO_SHIP', 'TO_RECEIVE', 'TO_REVIEW'];
 
@@ -183,9 +212,11 @@ async function search(query, { sort = null, limit = 20 } = {}) {
  */
 function parseCard(c) {
   const parts = c.text.split(' ~ ').map((x) => x.trim()).filter(Boolean);
-  const priceRaw = parts.find((x) => /^฿/.test(x)) || null;
-  const price = priceRaw ? Number(priceRaw.replace(/[^\d.]/g, '')) : null;
-  const sold = Number(((c.text.match(/([\d.,]+)\s*(?:sold|ขายแล้ว)/i) || [])[1] || '').replace(/[.,]/g, '')) || 0;
+  // Знак валюты стоит по-разному: в Таиланде слева (฿168.00),
+  // во Вьетнаме справа (168.000 ₫). Ищем с любой стороны.
+  const priceRaw = parts.find((x) => /^[฿₫]\s*[\d.,]+$/.test(x) || /^[\d.,]+\s*[฿₫]$/.test(x)) || null;
+  const price = priceRaw ? R.num(priceRaw) : null;
+  const sold = Number(((c.text.match(R.sold) || [])[1] || '').replace(/[.,]/g, '')) || 0;
   const reviews = Number((c.text.match(/\((\d+)\)/) || [])[1]) || 0;
   const name = parts[0] || '';
   const nit = Number((c.text.match(/(\d{3,4})\s*(?:nit|nits|นิต)/i) || [])[1]) || null;
@@ -244,11 +275,15 @@ async function addToCart(target, { qty = 1 } = {}) {
     await bridge.sleep(1200);
   }
 
+  // «Buy Now» рядом и тоже содержит слово «mua»: берём точное совпадение
+  // по надписи корзины и никогда — по префиксу класса.
+  const labels = JSON.stringify(R.addBtn.filter((t) => t !== 'mua ngay'));
   const clicked = String(await bridge.runJS(`(function(){
+    var want = ${labels};
     var hit = null;
     document.querySelectorAll('button').forEach(function(el){
       var t = (el.innerText || '').trim().toLowerCase();
-      if (t === 'add to cart' || t.indexOf('\u0e2b\u0e22\u0e34\u0e1a\u0e43\u0e2a\u0e48\u0e15\u0e30\u0e01\u0e23\u0e49\u0e32') > -1) hit = el;
+      if (want.indexOf(t) > -1) hit = el;
     });
     if (!hit) return 'кнопки «Add to Cart» нет — возможно, нужен выбор варианта';
     hit.click();
@@ -259,7 +294,7 @@ async function addToCart(target, { qty = 1 } = {}) {
   await bridge.sleep(5000);
   const ok = String(await bridge.runJS(`(function(){
     var t = document.body.innerText;
-    return /added to cart|\u0e2b\u0e22\u0e34\u0e1a\u0e43\u0e2a\u0e48\u0e15\u0e30\u0e01\u0e23\u0e49\u0e32\u0e40\u0e23\u0e35\u0e22\u0e1a\u0e23\u0e49\u0e2d\u0e22/i.test(t) ? 'ok' : 'нет подтверждения';
+    return ${R.added.toString()}.test(t) ? 'ok' : 'нет подтверждения';
   })()`));
   return { url, qty, confirmed: ok === 'ok' };
 }
@@ -287,9 +322,9 @@ async function removeFromCart(pick) {
   // Удаление всегда спрашивает подтверждение модалкой «Remove from cart»
   // с кнопками REMOVE и CANCEL. Без этого шага позиция остаётся на месте.
   await bridge.runJS(`(function(){
+    var want = ${JSON.stringify(R.confirm)};
     var b = Array.prototype.slice.call(document.querySelectorAll('button, a, span[role=button]'))
-      .find(function(e){ var t=(e.innerText||'').trim().toLowerCase();
-        return t === 'remove' || t === '\u0e25\u0e1a' || t === 'ok' || t === 'confirm'; });
+      .find(function(e){ return want.indexOf((e.innerText||'').trim().toLowerCase()) > -1; });
     if (!b) return 'нет кнопки подтверждения';
     b.click();
     return 'ok';
@@ -300,4 +335,4 @@ async function removeFromCart(pick) {
 }
 
 module.exports = { orders, filter, fetchPage, ensurePage, search, parseCard,
-  cart, addToCart, removeFromCart, productUrl, HOST, CUR, TABS };
+  cart, addToCart, removeFromCart, productUrl, HOST, CUR, TABS, REGION };
