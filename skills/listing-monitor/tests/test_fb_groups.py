@@ -216,7 +216,7 @@ def test_remote_host_switches_transport(monkeypatch):
     monkeypatch.setattr(fb_groups, "_run_remote", lambda g: calls.append("remote") or '{"posts": []}')
     monkeypatch.setattr(fb_groups, "_run_local", lambda g: calls.append("local") or '{"posts": []}')
 
-    cfg = SimpleNamespace(offer="rent", fb_groups={"groups": ["g"], "queries": ["q"], "remote_host": "spex"})
+    cfg = SimpleNamespace(offer="rent", fb_groups={"groups": ["g"], "queries": ["q"], "remote_host": "test-host"})
     fb_groups.fetch(cfg)
     cfg_local = SimpleNamespace(offer="rent", fb_groups={"groups": ["g"], "queries": ["q"]})
     fb_groups.fetch(cfg_local)
