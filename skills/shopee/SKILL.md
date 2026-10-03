@@ -95,6 +95,16 @@ sold_month, rating, liked, shop, location, sold_out, url`.
 - **A click is not a result.** `add` compares the cart badge before and after and returns
   `not-added` plus whatever the page says when it did not grow. The old snippet returned
   `added` unconditionally, so a blocked or out-of-stock item looked like success.
+- **`el.click()` ≠ real click for React.** Synthetic clicks carry `isTrusted=false`
+  and the React handlers (Shopee, Lazada) ignore them — a variant does not get selected,
+  the cart badge does not grow. Workaround: dispatch the full event set
+  `pointerdown → mousedown → pointerup → mouseup → click` with real element coordinates,
+  all `bubbles: true`. Helper `realClick(el)` lives inline in `js/pick_one.js`,
+  `js/add_to_cart.js`, `js/step_increase.js`. Verified 2026-10-03 on
+  `cart.lazada.vn` (checkboxes, CONFIRM CART) — the same trick works on Shopee.
+  Use it when a click on a React-controlled element seems to do nothing;
+  do not replace with Playwright `page.click` — that one IS a trusted click but
+  lands wherever the bridge tab currently is (see the background-tab rule above).
 - **Cart rows without options still exist.** `rows.js` anchors on the quantity stepper and
   a price, not on a `Variations:` line — single-SKU items (monitors, cables) used to be
   dropped from `cart` output and the cart read emptier than it was.

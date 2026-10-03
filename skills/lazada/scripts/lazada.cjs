@@ -16,6 +16,27 @@
  */
 const path = require('path');
 
+
+/** Реальный клик по элементу для React-интерфейсов Lazada/Shopee.
+ *  `el.click()` даёт isTrusted=false, и React игнорирует его — вариант не выбирается,
+ *  корзина не растёт, позиция не удаляется. Обход — полный набор событий
+ *  pointerdown → mousedown → pointerup → mouseup → click с координатами.
+ *  Проверено 03.10.2026: cart checkboxes и CONFIRM CART на cart.lazada.vn.
+ */
+function realClickInDoc(el) {
+  if (!el) return 'no-element';
+  el.click();
+  const r = el.getBoundingClientRect();
+  const opts = { bubbles: true, cancelable: true,
+                 clientX: r.x + r.width / 2, clientY: r.y + r.height / 2,
+                 pointerId: 1, pointerType: 'mouse', isPrimary: true, button: 0 };
+  el.dispatchEvent(new PointerEvent('pointerdown', opts));
+  el.dispatchEvent(new MouseEvent('mousedown', opts));
+  el.dispatchEvent(new PointerEvent('pointerup', opts));
+  el.dispatchEvent(new MouseEvent('mouseup', opts));
+  el.dispatchEvent(new MouseEvent('click', opts));
+  return 'ok';
+}
 // Мост к живому Chrome общий с шопи-скиллом. Своей копии не держим: правка
 // в одном месте — работает у обоих.
 const BRIDGE = path.join(process.env.HOME, '.pi/agent/skills/shopee-search/scripts/bridge.cjs');
@@ -269,7 +290,7 @@ async function addToCart(target, { qty = 1 } = {}) {
     await bridge.runJS(`(function(){
       var up = document.querySelector('[class*=next-number-picker-handler-up]');
       if (!up) return 'нет счётчика';
-      for (var i = 1; i < ${Number(qty)}; i++) up.click();
+      for (var i = 1; i < ${Number(qty)}; i++) realClickInDoc(up);
       return 'ok';
     })()`);
     await bridge.sleep(1200);
@@ -286,7 +307,7 @@ async function addToCart(target, { qty = 1 } = {}) {
       if (want.indexOf(t) > -1) hit = el;
     });
     if (!hit) return 'кнопки «Add to Cart» нет — возможно, нужен выбор варианта';
-    hit.click();
+    realClickInDoc(hit);
     return 'ok';
   })()`));
   if (clicked !== 'ok') throw new Error(clicked);
@@ -315,7 +336,7 @@ async function removeFromCart(pick) {
     if (!row) return 'нет строки';
     var del = row.querySelector('[class*=automation-btn-delete], [class*=icon-Delete]');
     if (!del) return 'нет кнопки удаления';
-    del.click();
+    realClickInDoc(del);
     return 'ok';
   })()`);
   await bridge.sleep(2500);
@@ -326,7 +347,7 @@ async function removeFromCart(pick) {
     var b = Array.prototype.slice.call(document.querySelectorAll('button, a, span[role=button]'))
       .find(function(e){ return want.indexOf((e.innerText||'').trim().toLowerCase()) > -1; });
     if (!b) return 'нет кнопки подтверждения';
-    b.click();
+    realClickInDoc(b);
     return 'ok';
   })()`);
   await bridge.sleep(4000);

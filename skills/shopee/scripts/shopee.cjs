@@ -211,7 +211,7 @@ async function add() {
     selected = await jsonFile('selected');
   }
   if (!want.every((l) => selected.includes(l))) throw new Error(`variants not selected: ${JSON.stringify(selected)}`);
-  for (let i = 1; i < qty; i++) { await runJS("(function(){const b=document.querySelector('button[aria-label=\"Increase\"]');b&&b.click();return 'inc'})()"); await sleep(900); }
+  for (let i = 1; i < qty; i++) { await runFile('step_increase'); await sleep(900); }
   // The click itself proves nothing: Shopee happily renders the button for items it
   // refuses to add. Compare the cart badge before and after, and when it did not grow
   // report the page's own explanation instead of a cheerful lie.

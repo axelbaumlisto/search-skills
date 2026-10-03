@@ -27,6 +27,13 @@ LAZADA_REGION=vn scripts/lazada.sh orders    # то же самое руками
 - кнопка корзины: `Add to Cart` ↔ `Thêm vào giỏ hàng`, подтверждение удаления
   `REMOVE` ↔ `XÓA`. Совпадение по **точному** тексту: во вьетнамском «Mua ngay»
   (купить сразу) стоит рядом, и поиск по подстроке оформит заказ вместо корзины.
+- **`el.click()` не работает на React** (Lazada и Shopee): синтетический клик
+  несёт `isTrusted=false`, обработчики его игнорируют — чекбокс не отмечается,
+  корзина не растёт. Обход — helper `realClickInDoc(el)` в `lazada.cjs`:
+  полный набор событий `pointerdown → mousedown → pointerup → mouseup → click`
+  с реальными координатами элемента, все `bubbles: true`. Проверено
+  03.10.2026 на корзине `cart.lazada.vn` — через него отмечались 4 позиции
+  и нажимался CONFIRM CART.
 
 Сессии у стран независимые: логин на `lazada.co.th` не даёт доступа к
 `my.lazada.vn` — заказы отдадут редирект на `login-signup`. Владелец логинится
