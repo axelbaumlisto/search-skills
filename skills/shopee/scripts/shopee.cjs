@@ -2,7 +2,7 @@
 /** Shopee CLI: search / item / cart. Region via SHOPEE_REGION=vn|th (regions.cjs).
  *  See SKILL.md for the anti-bot rules. */
 const { R, withPage, captureJson, parseItem, money } = require(`${__dirname}/lib.cjs`);
-const { runJS, runFile, json, jsonFile, go, autoScroll, sleep } = require(`${__dirname}/browser.cjs`);
+const { runJS, runFile, json, jsonFile, go, autoScroll, sleep, showTab, hideTab } = require(`${__dirname}/browser.cjs`);
 
 const argv = process.argv.slice(2);
 const cmd = argv[0];
@@ -169,9 +169,19 @@ async function ensureCart() {
   if (!here.includes(`${R.host}/cart`)) await go(`${R.base}/cart`);
 }
 
+/** "No rows" means two very different things: an empty cart, or a page that has not
+ *  hydrated yet — and a freshly created bridge tab hits the second case. Reporting an empty
+ *  cart when the cart is full is the worse failure of the two, so we only believe zero once
+ *  Shopee itself says the cart is empty. */
 async function cartCmd() {
   await ensureCart();
-  const rows = await liveRows();
+  let rows = await liveRows();
+  for (let attempt = 0; !rows.length && attempt < 3; attempt++) {
+    const says = await runJS(`/${R.emptyCart}/i.test(document.body.innerText) ? 'empty' : 'not-ready'`);
+    if (says === 'empty') break;
+    await sleep(2500);
+    rows = await liveRows();
+  }
   out({ items: rows.length, rows });
 }
 
@@ -181,6 +191,10 @@ async function add() {
   if (!url) throw new Error('add needs a product url');
   const want = argv.reduce((a, v, i) => (v === '--variant' && argv[i + 1] ? [...a, argv[i + 1]] : a), []);
   const qty = Number(val('qty', 1));
+  // Writes need a foreground tab: Chrome throttles background tabs and Shopee's
+  // variant buttons swallow the click without changing state. Reads are unaffected.
+  showTab();
+  try {
   await go(url);
   // one option per call: a single-option tier auto-selects after the first pick, and a
   // second click in the same tick would silently clear it
@@ -198,10 +212,26 @@ async function add() {
   }
   if (!want.every((l) => selected.includes(l))) throw new Error(`variants not selected: ${JSON.stringify(selected)}`);
   for (let i = 1; i < qty; i++) { await runJS("(function(){const b=document.querySelector('button[aria-label=\"Increase\"]');b&&b.click();return 'inc'})()"); await sleep(900); }
-  const res = await runFile('add_to_cart');
+  // The click itself proves nothing: Shopee happily renders the button for items it
+  // refuses to add. Compare the cart badge before and after, and when it did not grow
+  // report the page's own explanation instead of a cheerful lie.
+  let click = {};
+  try { click = JSON.parse(await runFile('add_to_cart')); } catch { click = { ok: false, reason: 'unparsable' }; }
+  if (!click.ok) throw new Error(`add failed: ${click.reason}`);
   await sleep(6000);
-  const badge = await runJS("String((document.body.innerText.match(/items in cart (\\d+)/i)||[])[1]||'?')");
-  out({ action: 'add', url, variants: picked, selected, qty, result: res, cart_badge: badge });
+  let after = {};
+  try { after = JSON.parse(await runFile('add_result')); } catch { after = {}; }
+  const grew = click.before != null && after.after != null && after.after > click.before;
+  const result = grew ? 'added' : 'not-added';
+  const res = { action: 'add', url, variants: picked, selected, qty, result,
+    cart_before: click.before, cart_after: after.after };
+  if (!grew) {
+    res.stock = after.stock || null;
+    res.sold_out = after.soldOut || null;
+    res.page_says = (after.messages || []).filter(Boolean);
+  }
+  out(res);
+  } finally { hideTab(); }
 }
 
 /** qty <row> <count> */

@@ -46,12 +46,21 @@ on killFile(p)
 	end try
 end killFile
 
+on trimmed(t)
+	set t to t as text
+	repeat while t ends with linefeed or t ends with return or t ends with space
+		if (count of t) is 1 then return ""
+		set t to text 1 thru -2 of t
+	end repeat
+	return t
+end trimmed
+
 on bridgeTab()
 	set idFile to "/tmp/shopee_tab.id"
 	set wantId to ""
 	if my fileExists(idFile) then
 		try
-			set wantId to my readFile(idFile)
+			set wantId to my trimmed(my readFile(idFile))
 		end try
 	end if
 	tell application "Google Chrome"
@@ -64,11 +73,12 @@ on bridgeTab()
 				end repeat
 			end repeat
 		end if
-		set nw to make new window
-		set nt to active tab of nw
-		my writeFile(idFile, ((id of nt) as text))
-		return nt
 	end tell
+
+	-- Creating windows is Node's job (chrome_tab.cjs): it can ask System Events which
+	-- profile a window belongs to, and it restores the owner's focus afterwards. The applet
+	-- has neither ability, so it only ever uses a tab that already exists.
+	error "bridge: no bridge tab (chrome_tab.ensureTab must create it)" number 9001
 end bridgeTab
 
 on run

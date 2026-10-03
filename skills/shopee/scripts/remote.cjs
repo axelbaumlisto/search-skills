@@ -114,4 +114,9 @@ async function stopServer() {
 
 const serverAlive = () => cdpAlive();
 
-module.exports = { runJS, runFile, json, jsonFile, go, autoScroll, stopServer, serverAlive, sleep };
+// Interface parity with bridge.cjs. The server browser has a single visible tab,
+// so there is no background-throttling problem and nothing to switch.
+const showTab = () => false;
+const hideTab = () => {};
+
+module.exports = { runJS, runFile, json, jsonFile, go, autoScroll, stopServer, serverAlive, sleep, showTab, hideTab };

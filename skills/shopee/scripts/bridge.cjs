@@ -17,6 +17,11 @@ const JOB = '/tmp/shopee_job.js'; const GO = '/tmp/shopee_job.go';
 const OUT = '/tmp/shopee_job.out'; const HB = '/tmp/shopee_job.hb';
 const QUIT = '/tmp/shopee_job.quit';
 
+// Windows, tabs, profiles and failure diagnosis live in their own module; this file only
+// ships jobs to the resident applet and reads the answers back.
+const chrome = require(`${__dirname}/chrome_tab.cjs`);
+const { showTab, hideTab } = chrome;
+
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const rm = (p) => { try { fs.unlinkSync(p); } catch { /* already gone */ } };
 
@@ -29,6 +34,9 @@ function serverAlive() {
  *  the user's focus ten times per search. */
 async function ensureServer() {
   if (serverAlive()) return;
+  // Create the tab from here, where System Events is permitted; the applet cannot ask
+  // which profile a window belongs to and would launch a focus-stealing window instead.
+  await chrome.ensureTab();
   fs.copyFileSync(SERVER, AS);
   rm(QUIT); rm(GO); rm(OUT);
   // -g: do not bring the applet forward. -j: start hidden. It stays the responsible
@@ -38,8 +46,11 @@ async function ensureServer() {
   throw new Error('bridge: server did not start (is ChromeBridge.app allowed in Automation?)');
 }
 
-/** Run JS in the dedicated tab; returns the string the JS returned (must be sync, no Promise). */
-async function runJS(js, { timeoutMs = 50000 } = {}) {
+/** Run JS in the dedicated tab; returns the string the JS returned (must be sync, no Promise).
+ *  ERR 12 means Chrome refused JS from Apple Events. A resident applet started while the
+ *  setting was off keeps reporting it even after the user ticks the box, so the applet is
+ *  killed and the job retried once instead of telling the user to enable what is enabled. */
+async function runJS(js, { timeoutMs = 50000, _retried = false } = {}) {
   await ensureServer();
   rm(OUT);
   fs.writeFileSync(JOB, js);
@@ -48,12 +59,23 @@ async function runJS(js, { timeoutMs = 50000 } = {}) {
     await sleep(250);
     if (fs.existsSync(OUT) && !fs.existsSync(GO)) {
       const out = fs.readFileSync(OUT, 'utf8').trim();
+      if (/^ERR 12\b/.test(out) && !_retried) {
+        try { execFileSync('pkill', ['-f', 'ChromeBridge.app']); } catch {}
+        await sleep(1500);
+        return runJS(js, { timeoutMs, _retried: true });
+      }
+      // 9001: the owner closed the bridge window. Reopen it once, on demand — checking the
+      // tab before every job would cost an osascript round trip per call.
+      if (/^ERR 9001\b/.test(out) && !_retried) {
+        await chrome.ensureTab();
+        return runJS(js, { timeoutMs, _retried: true });
+      }
       if (out.startsWith('ERR')) throw new Error(`bridge: ${out}`);
       return out.replace(/^OK\s?/, '');
     }
     if (!serverAlive()) await ensureServer();
   }
-  throw new Error('bridge: job timeout');
+  throw new Error(`bridge: job timeout — ${chrome.diagnose()}`);
 }
 
 /** Ask the resident applet to quit (it also self-quits after ~2 min idle). */
@@ -84,4 +106,4 @@ async function autoScroll({ steps = 10, everyMs = 700, px = 1400 } = {}) {
   await sleep(steps * everyMs + 2500);
 }
 
-module.exports = { runJS, runFile, json, jsonFile, go, autoScroll, stopServer, serverAlive, sleep };
+module.exports = { runJS, runFile, json, jsonFile, go, autoScroll, stopServer, serverAlive, sleep, showTab, hideTab };

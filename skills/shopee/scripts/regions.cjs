@@ -25,6 +25,9 @@ const REGIONS = {
     cookieFile: path.join(COOKIE_DIR, 'shopee.cookies.txt'),
     // star-filter tab captions seen in the ratings section, per UI language
     starWords: ['Star', 'Sao'],
+    // How Shopee words an empty cart. Needed to tell "cart is empty" apart from
+    // "page has not rendered yet", which otherwise reads as an empty cart.
+    emptyCart: 'Your shopping cart is empty|Giỏ hàng của bạn còn trống|chưa có sản phẩm',
     searchLive: false,
   },
   th: {
@@ -39,6 +42,7 @@ const REGIONS = {
     imgCdn: 'down-th',
     cookieFile: path.join(COOKIE_DIR, 'shopee_th.cookies.txt'),
     starWords: ['Star', 'ดาว'],
+    emptyCart: 'Your shopping cart is empty|รถเข็นของคุณว่างเปล่า|ไม่มีสินค้า',
     // shopee.co.th answers the headless search XHR with error 90309999
     // ({"business":"Search"}) even with valid cookies — read the rendered grid instead.
     searchLive: true,

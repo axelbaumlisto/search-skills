@@ -56,6 +56,51 @@ sold_month, rating, liked, shop, location, sold_out, url`.
 
 ## Hard-won rules
 
+- **The bridge must live in the Chrome profile that holds the Shopee session.** The owner
+  runs two profiles (personal `Aleksandr`, work `Aleksandr (gene.com)`), and AppleScript's
+  `make new window` opens in whichever profile Chrome used last. A bridge born in the wrong
+  one is logged out (`/verify/traffic/error?...is_logged_in=false`) and, because
+  *Allow JavaScript from Apple Events* is a **per-profile** switch, every job dies with
+  `bridge: job timeout`. `bridge_server.applescript` spawns its window through
+  `open --profile-directory`; the profile is configured once in `scripts/profile.dir`
+  (default `Default`) and `bridge.cjs` hands it to the applet at startup. There is no
+  silent fallback to `make new window` — that is the bug itself, so the server fails loudly
+  instead.
+- **One dedicated background window, never a tab in the owner's window.** `chrome_tab.cjs:
+  ensureTab()` sweeps stray `#pi-bridge` tabs, opens a single window with `open -g -na
+  --profile-directory=…`, then restores the previously frontmost app. Two earlier attempts
+  were wrong and both annoyed the owner: `make new tab` in his working window littered it
+  (and a recovery loop would storm it with tabs), while plain window creation stole focus
+  mid-typing. Window creation stays in Node because only it may talk to System Events — the
+  applet has no such grant, so when it tried to match a window by profile it always got
+  nothing and launched one instead. If the owner closes the bridge window, the applet
+  answers `ERR 9001` and `runJS` reopens it once; the tab is **not** probed before every
+  job, that would cost an osascript round trip per call.
+- **A job timeout now names its suspect.** `chrome_tab.cjs: diagnose()` reports a lost tab,
+  a wrong-profile window with scripting blocked, a `chrome://` page, or a stuck applet.
+  Read that line before theorising about anti-bot defences — the last investigation burned
+  half an hour on Shopee's defences while the cause was a Chrome profile.
+- **Zero cart rows is ambiguous.** A freshly created bridge tab has not hydrated yet, and
+  the row parser then reports an empty cart while the cart is full. `cartCmd` only trusts a
+  zero after Shopee itself prints its empty-cart wording (`R.emptyCart` per region);
+  otherwise it waits and re-reads up to three times.
+- **Writes need the bridge tab in the foreground.** Chrome throttles background tabs:
+  the click reaches `document` but Shopee never updates its state, so every variant pick
+  reports `variant not selected` and nothing lands in the cart. `add` brackets itself with
+  `showTab()` / `hideTab()` — it switches the active tab *inside* Chrome and switches it
+  back, without activating the app, so the owner's focus is untouched. Reads work fine in
+  the background; only mutations need this. Do not debug this as an anti-bot problem: a
+  real `cliclick` at screen coordinates also fails, because it lands on whatever tab is
+  actually visible.
+- **A click is not a result.** `add` compares the cart badge before and after and returns
+  `not-added` plus whatever the page says when it did not grow. The old snippet returned
+  `added` unconditionally, so a blocked or out-of-stock item looked like success.
+- **Cart rows without options still exist.** `rows.js` anchors on the quantity stepper and
+  a price, not on a `Variations:` line — single-SKU items (monitors, cables) used to be
+  dropped from `cart` output and the cart read emptier than it was.
+- **`ERR 12` is usually stale, not disabled.** A resident `ChromeBridge.app` started while
+  *Allow JavaScript from Apple Events* was off keeps returning error 12 after the user
+  enables it. `runJS` now kills the applet and retries once before blaming the user.
 - **Never patch `navigator.webdriver`.** Shopee's fingerprint script detects the tampered
   getter and every search returns `error 90309999`. Vanilla Chromium + real cookies passes.
 - **Plain curl cannot search.** `/api/v4/search/search_items` needs an anti-bot signature

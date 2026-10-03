@@ -9,3 +9,5 @@ fb_marketplace_graphql.json
 fb_local_state.json
 .DS_Store
 package-lock.json
+# рантайм: id вкладки моста, у каждой машины свой
+skills/*/scripts/.bridge-tab.id
