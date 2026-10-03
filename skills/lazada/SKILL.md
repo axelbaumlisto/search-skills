@@ -33,6 +33,14 @@ LAZADA_REGION=vn scripts/lazada.sh orders    # то же самое руками
 один раз руками (во Вьетнаме — кнопкой «Login with Google»), дальше кука живёт
 в профиле Chrome.
 
+**Профиль для моста.** Мост, общий с `shopee`, открывает своё окно через
+`open -g -na --profile-directory <путь из shopee/scripts/profile.dir>` —
+не в «последнем активном» профиле. Путь задаётся один раз в shopee-скилле,
+lazada его переиспользует. Менять вручную не нужно; если окно моста всё же
+всплыло в чужом профиле и сессии нет — значит файл `profile.dir` пуст
+(пересоздать: `echo "$HOME/Library/Application Support/Google/Chrome/Default"
+> shopee/scripts/profile.dir` с путём нужного профиля).
+
 ## Commands
 
 ```bash

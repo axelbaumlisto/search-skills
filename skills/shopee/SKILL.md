@@ -179,6 +179,22 @@ Setup, needed once per machine:
 3. Chrome: *View → Developer → Allow JavaScript from Apple Events*. Writing
    `browser.allow_javascript_apple_events` into `Local State`/`Preferences` does **not** work;
    only the menu toggle does. Without it every call fails with `-1723 Access not allowed`.
+
+   **Russian locale Chrome.** Menu names differ: *Вид → Разработчикам → Разрешить
+   JavaScript из событий Apple*. Toggling it programmatically:
+
+   ```applescript
+   tell application "System Events" to tell process "Google Chrome"
+     set frontmost to true
+     click menu item "Разрешить JavaScript из событий Apple" \
+       of menu "Разработчикам" of menu item "Разработчикам" \
+       of menu "Вид" of menu bar item "Вид" of menu bar 1
+   end tell
+   ```
+
+   Check state (only a tick means on): `get value of attribute "AXMenuItemMarkChar" of
+   the same menu item` — returns `✓` when enabled, `missing value` when off. The setting
+   is per-profile (see rule 1) — toggling in profile `A` does nothing for profile `B`.
 4. Syntax matters: `tell active tab of first window … execute javascript` works,
    `execute javascript … in t` fails with `-1700`.
 
