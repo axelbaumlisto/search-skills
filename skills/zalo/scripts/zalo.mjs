@@ -252,6 +252,19 @@ async function watch(page, filter, acc) {
   return fresh;
 }
 
+/** Превью в списке обрезано многоточием — цена или размер из ответа поставщика
+ *  туда не влезут. Поэтому по каждому новому чату заходим и берём живой текст. */
+async function watchFull(page, fresh, n = 6) {
+  const out = [];
+  for (const r of fresh) {
+    let lines = [];
+    try { lines = await read(page, r.name, n); }
+    catch (e) { lines = ['(не удалось открыть: ' + (e.message || '').slice(0, 60) + ')']; }
+    out.push({ ...r, lines });
+  }
+  return out;
+}
+
 const [cmd = 'list', arg = '', arg2 = ''] = process.argv.slice(2);
 const pw = loadPlaywright();
 console.error(`# ${ensureTunnel()}`);
@@ -281,8 +294,17 @@ if (cmd === 'tabs') {
   } else if (cmd === 'watch') {
     const accNum = process.argv.includes('--acc') ? process.argv[process.argv.indexOf('--acc') + 1] : '1';
     const fresh = await watch(page, arg, accNum);
-    if (!fresh.length) console.log('нового нет');
-    else fresh.forEach(r => console.log(`НОВОЕ · ${r.name} · ${r.when}\n    ${r.preview}`));
+    if (!fresh.length) { console.log('нового нет'); }
+    else if (process.argv.includes('--full')) {
+      const full = await watchFull(page, fresh);
+      for (const r of full) {
+        console.log(`НОВОЕ · ${r.name} · ${r.when}`);
+        r.lines.forEach(l => console.log('    ' + l));
+        console.log('');
+      }
+    } else {
+      fresh.forEach(r => console.log(`НОВОЕ · ${r.name} · ${r.when}\n    ${r.preview}`));
+    }
   } else if (cmd === 'find') {
     const rows = await list(page, 60);
     const q = arg.toLowerCase();
