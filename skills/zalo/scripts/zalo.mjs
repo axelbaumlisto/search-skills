@@ -20,7 +20,8 @@
  */
 import { createRequire } from 'node:module';
 import { execSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { join, dirname } from 'node:path';
 import { homedir } from 'node:os';
 
 const require = createRequire(import.meta.url);
@@ -221,6 +222,36 @@ async function unsend(page, name) {
   return txt.split('\n').map(x => x.trim()).filter(Boolean).slice(-3);
 }
 
+/** Следилка: помнит последнее виденное превью по каждому чату и показывает
+ *  только новое. Состояние — JSON рядом со скриптом, по аккаунту отдельно. */
+function watchFile(acc) {
+  return join(homedir(), '.cache', `zalo-watch-${acc}.json`);
+}
+async function watch(page, filter, acc) {
+  const f = watchFile(acc);
+  let seen = {};
+  try { seen = JSON.parse(readFileSync(f, 'utf8')); } catch {}
+  // Zalo ставит в именах и превью НЕРАЗРЫВНЫЕ пробелы — без нормализации
+  // фильтр по обычному пробелу не совпадает никогда
+  const nb = x => (x || '').replace(/\u00a0/g, ' ').trim();
+  const rows = (await list(page, 40)).map(r => ({ ...r, name: nb(r.name), preview: nb(r.preview) }));
+  const pats = filter ? filter.split(',').map(x => nb(x).toLowerCase()).filter(Boolean) : null;
+  const fresh = [];
+  for (const r of rows) {
+    if (pats && !pats.some(p => r.name.toLowerCase().includes(p))) continue;
+    const key = r.name;
+    const val = `${r.when}|${r.preview}`;
+    if (seen[key] !== val) {
+      // своё же сообщение не считаем ответом
+      if (!/^Bạn:/.test(r.preview)) fresh.push(r);
+      seen[key] = val;
+    }
+  }
+  mkdirSync(dirname(f), { recursive: true });
+  writeFileSync(f, JSON.stringify(seen, null, 1));
+  return fresh;
+}
+
 const [cmd = 'list', arg = '', arg2 = ''] = process.argv.slice(2);
 const pw = loadPlaywright();
 console.error(`# ${ensureTunnel()}`);
@@ -247,6 +278,11 @@ if (cmd === 'tabs') {
     const tail = await unsend(page, arg);
     console.log('отозвано. хвост диалога:');
     tail.forEach(t => console.log('  ' + t));
+  } else if (cmd === 'watch') {
+    const accNum = process.argv.includes('--acc') ? process.argv[process.argv.indexOf('--acc') + 1] : '1';
+    const fresh = await watch(page, arg, accNum);
+    if (!fresh.length) console.log('нового нет');
+    else fresh.forEach(r => console.log(`НОВОЕ · ${r.name} · ${r.when}\n    ${r.preview}`));
   } else if (cmd === 'find') {
     const rows = await list(page, 60);
     const q = arg.toLowerCase();
