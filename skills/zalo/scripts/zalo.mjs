@@ -178,6 +178,9 @@ async function send(page, name, text) {
   // Поле ввода — сам #richInput. Кликать по нему НЕЛЬЗЯ: центр перекрыт
   // дочерним input_line_0, и playwright ждёт освобождения цели до таймаута.
   // Фокусируем через DOM — клавиатура после этого печатает прямо в поле.
+  // Один focus() через DOM не включает редактор: поле остаётся contenteditable=false
+  // и набранное теряется (так было во 2-м аккаунте 08.10.2026). Клик с force включает.
+  await page.locator('#richInput').click({ force: true, timeout: 5000 }).catch(() => {});
   const ok = await page.evaluate(() => {
     const e = document.querySelector('#richInput');
     if (!e) return false;
@@ -191,9 +194,13 @@ async function send(page, name, text) {
   const lines = text.split('\n');
   for (let i = 0; i < lines.length; i++) {
     if (i) await page.keyboard.press('Shift+Enter');
-    await page.keyboard.type(lines[i], { delay: 8 });
+    // insertText, а не type: посимвольный type на вьетнамских буквах с диакритикой
+    // зависает намертво (08.10.2026); insertText вставляет строку целиком, как IME.
+    await page.keyboard.insertText(lines[i]);
   }
   await page.waitForTimeout(400);
+  const typed = await page.evaluate(() => (document.querySelector('#richInput')?.innerText || '').trim().length);
+  if (!typed) throw new Error('текст не попал в поле ввода — ничего не отправлено');
   await page.keyboard.press('Enter');
   await page.waitForTimeout(2500);
   const txt = await page.$eval('#chatViewContainer', el => el.innerText);
