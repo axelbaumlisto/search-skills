@@ -57,15 +57,20 @@ ZALO_ACC=2 node $Z search "tủ bánh"
 | 1 (по умолчанию) | `~/.config/cloak-profile` | 9444 | 9445 |
 | 2 (`--acc 2`) | `~/.config/cloak-profile2` | 9446 | 9447 |
 
-Поднять второй браузер вручную, если упал:
+Второй браузер держит user-служба `cloak-zalo2` на хосте (`Restart=always`, CDP 9446):
 
 ```bash
-ssh "$ZALO_SSH_HOST" 'DISPLAY=:1 nohup ~/.cloakbrowser/chromium-*/chrome --no-sandbox \
-  --disable-dev-shm-usage --ozone-platform=x11 \
-  --user-data-dir=$HOME/.config/cloak-profile2 \
-  --remote-debugging-port=9446 --remote-allow-origins="*" \
-  https://chat.zalo.me/ >/tmp/cloak2.log 2>&1 &'
+ssh "$ZALO_SSH_HOST" 'systemctl --user status cloak-zalo2'    # жив?
+ssh "$ZALO_SSH_HOST" 'systemctl --user restart cloak-zalo2'   # поднять
 ```
+
+**Не запускать профиль руками и не жать «Open in app / Install» в окне Zalo**: так
+браузер стартует как приложение без `--remote-debugging-port`, порт 9446 пропадает,
+и `--acc 2` молча не видит аккаунт (так и было до 08.10.2026). Если окно уже открыто
+вручную — закрыть (`kill -TERM`), удалить `~/.config/cloak-profile2/Singleton*`,
+`systemctl --user start cloak-zalo2`; сессия в профиле сохраняется, QR не нужен.
+
+**«Проверь новые сообщения» = оба аккаунта**: `watch` и `watch --acc 2`.
 
 Логин — один раз по QR через VNC (`https://clipshot.cc/vnc/`), дальше сессия
 живёт в профиле.
