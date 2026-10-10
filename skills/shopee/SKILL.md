@@ -80,6 +80,9 @@ sold_month, rating, liked, shop, location, sold_out, url`.
   a wrong-profile window with scripting blocked, a `chrome://` page, or a stuck applet.
   Read that line before theorising about anti-bot defences — the last investigation burned
   half an hour on Shopee's defences while the cause was a Chrome profile.
+- **`--check` says `session DEAD` even after `--refresh-cookies`** — the Chrome profile
+  itself is logged out: the exported `SPC_U` cookie is `-` and the API answers
+  `Failed to authenticate`. Not a script bug; the owner signs in on shopee.vn once.
 - **Zero cart rows is ambiguous.** A freshly created bridge tab has not hydrated yet, and
   the row parser then reports an empty cart while the cart is full. `cartCmd` only trusts a
   zero after Shopee itself prints its empty-cart wording (`R.emptyCart` per region);

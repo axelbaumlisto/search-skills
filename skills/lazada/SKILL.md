@@ -103,6 +103,12 @@ Ultron payload with per-component signatures; sync with `page` does the same job
 quantity stepper is clicked `qty - 1` times, then the button is pressed and the
 `Added to cart successfully` toast is checked.
 
+**Page JS cannot see Node functions.** `realClickInDoc` lives in `lazada.cjs`; every
+`runJS` that clicks must carry its source (`CLICK_SRC`). Without it the page throws
+`ReferenceError`, `runJS` returns `null` and the CLI prints `ошибка: (null)`.
+The helper fires one `click` event only — an extra `el.click()` put every item in the
+cart twice (fixed 2026-10-08).
+
 **Press the button by its text, not its class.** `Add to Cart` carries
 `add-to-cart-buy-now-btn`, while the neighbouring `Buy Now` carries `add-to-cart`.
 A class-prefix selector therefore starts a checkout instead of filling the cart.
