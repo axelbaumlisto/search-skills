@@ -46,6 +46,14 @@ playbooks instead of this thin wrapper — they carry per-site recipes:
 - the Playwright control notes on that host — calibrating
   selectors for scraping briefs
 
+## When every job times out
+
+Symptom: `CDP connect failed: Timeout … ws connected`, or `FAILED: no content`.
+Cause seen 2026-10-08: one hung `about:blank` tab — Playwright attaches to every
+page and waits for each. `browse.sh` and `fb-search.sh` now run `scripts/cdp_heal.py`
+first: it closes unresponsive blank tabs and only warns about other hung tabs
+(they may hold a login). Manual run: `ssh <host> python3 /tmp/cdp_heal.py`.
+
 ## Shared-browser etiquette
 
 One Chrome instance serves Facebook search, scraping briefs and the VNC

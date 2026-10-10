@@ -74,6 +74,16 @@ wrapper starts the job with `nohup`, polls for output, prints it, cleans up temp
 files, and kills the remote process on timeout. Raise the budget with
 `--wait 300` for slow queries.
 
+## Setup that both paths need
+
+- **Local HTTP path** imports city presets and parsers from `fb_marketplace.py`:
+  put it into `~/.config/fb-marketplace/browser-scripts/` (or set `FB_BROWSER_SCRIPTS`).
+  Without it the error says so instead of the old misleading "unknown city".
+- **Browser path** runs `fb_marketplace.py` on the remote host from `FB_REMOTE_DIR`,
+  or `remoteBrowser.fbScriptsDir` in `SKILLS_CONFIG`.
+- Before each browser job `cdp_heal.py` (from `remote-browser`) closes hung blank tabs:
+  one frozen `about:blank` made every `connect_over_cdp` time out.
+
 ## Hard limits (read before promising anything)
 
 | Constraint | Reality |
