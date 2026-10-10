@@ -17,6 +17,12 @@ if [ -z "$REMOTE" ] && [ -n "${SKILLS_CONFIG:-}" ] && [ -r "${SKILLS_CONFIG/#\~/
 fi
 REMOTE="${REMOTE:-remote-browser}"
 FB="${FB_REMOTE_SCRIPT:-fb_marketplace.py}"   # путь на удалённом хосте
+# Любая связь с хостом — с жёстким лимитом: подвисшее ssh без него держало скрипт часами.
+SSH_OPTS=(-o ConnectTimeout=10 -o ServerAliveInterval=10 -o ServerAliveCountMax=3)
+_lim() { local s="$1"; shift
+  if command -v timeout >/dev/null 2>&1; then timeout "$s" "$@"; else perl -e 'alarm shift; exec @ARGV' "$s" "$@"; fi; }
+rssh() { _lim "${RSSH_LIMIT:-60}" ssh -n "${SSH_OPTS[@]}" "$REMOTE" "$@"; }
+rscp() { _lim 60 scp -q "${SSH_OPTS[@]}" "$@"; }
 TAG="fb-$$"
 OUT="/tmp/$TAG.out"; ERR="/tmp/$TAG.err"
 CITIES="bangkok pattaya phuket samui phangan chiangmai krabi danang hcmc hanoi nhatrang hoian"
@@ -51,7 +57,7 @@ while [ $# -gt 0 ]; do
 done
 
 if [ "$MODE" = "health" ]; then
-  ssh -n -o ConnectTimeout=10 "$REMOTE" \
+  rssh \
     'systemctl --user is-active chrome-cdp.service; curl -s -m 5 http://localhost:9222/json/version | head -3' \
     || { echo "cannot reach $REMOTE" >&2; exit 1; }
   echo "hint: if Facebook is logged out, sign in once via ${FB_VNC_URL:-https://YOUR-HOST/vnc}"
@@ -103,9 +109,9 @@ if [ "$MODE" = "search" ] && [ -f "$LOCAL" ] && [ -z "$LAT" ]; then
   if [ "$LOCAL_SESSION" = "1" ]; then
     LOUT=$("$FB_PYTHON" "$LOCAL" "${LARGS[@]}" 2>/dev/null)
   else
-    scp -q "$LOCAL" "$REMOTE:/tmp/fb_local.py" 2>/dev/null
+    rscp "$LOCAL" "$REMOTE:/tmp/fb_local.py" 2>/dev/null
     QARGS=$(printf '%q ' "${LARGS[@]}")
-    LOUT=$(ssh -n -o ConnectTimeout=10 "$REMOTE" \
+    LOUT=$(rssh \
       "cd $FB_REMOTE_DIR && python3 /tmp/fb_local.py $QARGS" 2>/dev/null)
   fi
 
@@ -127,14 +133,14 @@ fi
 # tab and silently return the wrong listing. Serialise every browser job
 # (this script and browser-scout share /tmp/fb-browser.lock).
 HEAL="$(dirname "$0")/../../remote-browser/scripts/cdp_heal.py"
-[ -f "$HEAL" ] && scp -q "$HEAL" "$REMOTE:/tmp/cdp_heal.py" && ssh -n -o ConnectTimeout=10 "$REMOTE" "python3 /tmp/cdp_heal.py" || true
-ssh -n -o ConnectTimeout=10 "$REMOTE" \
+[ -f "$HEAL" ] && rscp "$HEAL" "$REMOTE:/tmp/cdp_heal.py" && rssh "python3 /tmp/cdp_heal.py" || true
+rssh \
   "cd $FB_REMOTE_DIR && nohup flock -w 300 /tmp/fb-browser.lock python3 $FB $ARGS >$OUT 2>$ERR & echo ok" >/dev/null \
   || { echo "cannot start remote job on $REMOTE" >&2; exit 1; }
 
 for _ in $(seq 1 "$((WAIT / 5))"); do
   sleep 5
-  STATE=$(ssh -n -o ConnectTimeout=10 "$REMOTE" \
+  STATE=$(rssh \
     "pgrep -f '[f]b_marketplace.py' >/dev/null && echo RUNNING || echo DONE; echo ---; cat $OUT" 2>/dev/null)
   # '[f]b_…' — иначе pgrep находит собственную оболочку ssh и задание «вечно RUNNING».
   # Пустой $OUT: $(...) срезает перевод строки после '---', поэтому режем без него.
@@ -147,12 +153,12 @@ done
 
 if [ -z "${BODY:-}" ] || [ -z "${BODY//[[:space:]]/}" ]; then
   echo "FAILED: no JSON after ${WAIT}s. stderr:" >&2
-  ssh -n "$REMOTE" "tail -c 400 $ERR" >&2
-  ssh -n "$REMOTE" "pkill -f '[f]b_marketplace.py'" 2>/dev/null
+  rssh "tail -c 400 $ERR" >&2
+  rssh "pkill -f '[f]b_marketplace.py'" 2>/dev/null
   echo "hint: check './fb-search.sh --health' and the VNC login" >&2
   exit 1
 fi
 
-ssh -n "$REMOTE" "rm -f $OUT $ERR" 2>/dev/null
+rssh "rm -f $OUT $ERR" 2>/dev/null
 if [ "$RAW" = 1 ]; then printf '%s\n' "$BODY"; exit 0; fi
 printf '%s' "$BODY" | python3 "$(dirname "$0")/_format.py"

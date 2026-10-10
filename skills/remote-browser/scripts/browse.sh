@@ -32,17 +32,23 @@ while [ $# -gt 0 ]; do
 done
 [ -n "$URL" ] || { echo "usage: browse.sh <url> [--html] [--chars N] [--shot FILE]" >&2; exit 2; }
 
+# Любая связь с хостом — с жёстким лимитом: подвисшее ssh без него держало скрипт часами.
+SSH_OPTS=(-o ConnectTimeout=10 -o ServerAliveInterval=10 -o ServerAliveCountMax=3)
+_lim() { local s="$1"; shift
+  if command -v timeout >/dev/null 2>&1; then timeout "$s" "$@"; else perl -e 'alarm shift; exec @ARGV' "$s" "$@"; fi; }
+rssh() { _lim "${RSSH_LIMIT:-60}" ssh -n "${SSH_OPTS[@]}" "$REMOTE" "$@"; }
+rscp() { _lim 60 scp -q "${SSH_OPTS[@]}" "$@"; }
 REMOTE_PY="/tmp/scout-$$.py"
-scp -q "$HELPER_LOCAL" "$REMOTE:$REMOTE_PY" || { echo "scp to $REMOTE failed" >&2; exit 1; }
+rscp "$HELPER_LOCAL" "$REMOTE:$REMOTE_PY" || { echo "scp to $REMOTE failed" >&2; exit 1; }
 # Зависшая пустая вкладка вешает connect_over_cdp у всех заданий — закрыть до старта.
-scp -q "$(dirname "$0")/cdp_heal.py" "$REMOTE:/tmp/cdp_heal.py" && ssh -n -o ConnectTimeout=10 "$REMOTE" "python3 /tmp/cdp_heal.py" || true
+rscp "$(dirname "$0")/cdp_heal.py" "$REMOTE:/tmp/cdp_heal.py" && rssh "python3 /tmp/cdp_heal.py" || true
 
 # Detached + polled: a foreground ssh call is killed while the page is still
 # loading, leaving an orphan tab in the shared browser.
 OUT="/tmp/scout-$$.out"; ERR="/tmp/scout-$$.err"
 # Shared single-tenant Chrome: serialise with the same lock marketplace-search
 # uses, otherwise concurrent jobs swap tabs and return each other's page.
-ssh -n -o ConnectTimeout=10 "$REMOTE" \
+rssh \
   "nohup flock -w 300 /tmp/fb-browser.lock python3 $REMOTE_PY '$URL' '$MODE' '$CHARS' '$SHOT' '$SETTLE' >$OUT 2>$ERR & echo ok" >/dev/null \
   || { echo "cannot start remote job" >&2; exit 1; }
 
@@ -51,13 +57,13 @@ ssh -n -o ConnectTimeout=10 "$REMOTE" \
 # re-transferred on every tick and the whole call appears to hang.
 for _ in $(seq 1 "$((WAIT / 5))"); do
   sleep 5
-  STATE=$(ssh -n -o ConnectTimeout=10 "$REMOTE" \
+  STATE=$(rssh \
     "pgrep -f '/tmp/[s]cout-$$.py' >/dev/null && echo RUNNING || echo DONE" 2>/dev/null)
   [ "$STATE" = "DONE" ] && break
 done
 
-BODY=$(ssh -n -o ConnectTimeout=10 "$REMOTE" "head -c $((CHARS * 4)) $OUT" 2>/dev/null)
-DIAG=$(ssh -n "$REMOTE" "cat $ERR; rm -f $REMOTE_PY $OUT $ERR" 2>/dev/null)
+BODY=$(rssh "head -c $((CHARS * 4)) $OUT" 2>/dev/null)
+DIAG=$(rssh "cat $ERR; rm -f $REMOTE_PY $OUT $ERR" 2>/dev/null)
 if [ -z "${BODY//[[:space:]]/}" ]; then
   echo "FAILED: no content after ${WAIT}s" >&2
   printf '%s\n' "$DIAG" | head -c 500 >&2
