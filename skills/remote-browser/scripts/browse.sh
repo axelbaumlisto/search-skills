@@ -34,6 +34,8 @@ done
 
 REMOTE_PY="/tmp/scout-$$.py"
 scp -q "$HELPER_LOCAL" "$REMOTE:$REMOTE_PY" || { echo "scp to $REMOTE failed" >&2; exit 1; }
+# Зависшая пустая вкладка вешает connect_over_cdp у всех заданий — закрыть до старта.
+scp -q "$(dirname "$0")/cdp_heal.py" "$REMOTE:/tmp/cdp_heal.py" && ssh -n -o ConnectTimeout=10 "$REMOTE" "python3 /tmp/cdp_heal.py" || true
 
 # Detached + polled: a foreground ssh call is killed while the page is still
 # loading, leaving an orphan tab in the shared browser.
@@ -44,12 +46,13 @@ ssh -n -o ConnectTimeout=10 "$REMOTE" \
   "nohup flock -w 300 /tmp/fb-browser.lock python3 $REMOTE_PY '$URL' '$MODE' '$CHARS' '$SHOT' '$SETTLE' >$OUT 2>$ERR & echo ok" >/dev/null \
   || { echo "cannot start remote job" >&2; exit 1; }
 
+# '[s]cout' — чтобы pgrep не находил собственную оболочку ssh (в её строке тот же путь).
 # Poll only the process state — never the payload, or a large HTML dump gets
 # re-transferred on every tick and the whole call appears to hang.
 for _ in $(seq 1 "$((WAIT / 5))"); do
   sleep 5
   STATE=$(ssh -n -o ConnectTimeout=10 "$REMOTE" \
-    "pgrep -f '$REMOTE_PY' >/dev/null && echo RUNNING || echo DONE" 2>/dev/null)
+    "pgrep -f '/tmp/[s]cout-$$.py' >/dev/null && echo RUNNING || echo DONE" 2>/dev/null)
   [ "$STATE" = "DONE" ] && break
 done
 

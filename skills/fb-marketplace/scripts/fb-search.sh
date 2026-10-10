@@ -27,6 +27,10 @@ LAT=""; LNG=""; RADIUS=""; MINP=""; MAXP=""
 # умолчанию рассчитаны на дефолтную установку; переопределяются переменными.
 FB_COOKIES="${FB_COOKIES:-$HOME/.config/fb-marketplace/facebook.cookies.txt}"
 FB_PYTHON="${FB_PYTHON:-python3}"
+# Каталог с fb_marketplace.py на удалённом хосте: FB_REMOTE_DIR или remoteBrowser.fbScriptsDir из SKILLS_CONFIG.
+if [ -z "${FB_REMOTE_DIR:-}" ] && [ -n "${SKILLS_CONFIG:-}" ] && [ -r "${SKILLS_CONFIG/#\~/$HOME}" ]; then
+  FB_REMOTE_DIR=$(python3 -c 'import json,os;p=os.path.expanduser(os.environ["SKILLS_CONFIG"]);print(json.load(open(p)).get("remoteBrowser",{}).get("fbScriptsDir",""))' 2>/dev/null)
+fi
 FB_REMOTE_DIR="${FB_REMOTE_DIR:-.}"
 
 while [ $# -gt 0 ]; do
@@ -122,6 +126,8 @@ fi
 # The remote Chrome is single-tenant: two concurrent jobs read each other's
 # tab and silently return the wrong listing. Serialise every browser job
 # (this script and browser-scout share /tmp/fb-browser.lock).
+HEAL="$(dirname "$0")/../../remote-browser/scripts/cdp_heal.py"
+[ -f "$HEAL" ] && scp -q "$HEAL" "$REMOTE:/tmp/cdp_heal.py" && ssh -n -o ConnectTimeout=10 "$REMOTE" "python3 /tmp/cdp_heal.py" || true
 ssh -n -o ConnectTimeout=10 "$REMOTE" \
   "cd $FB_REMOTE_DIR && nohup flock -w 300 /tmp/fb-browser.lock python3 $FB $ARGS >$OUT 2>$ERR & echo ok" >/dev/null \
   || { echo "cannot start remote job on $REMOTE" >&2; exit 1; }
@@ -129,8 +135,10 @@ ssh -n -o ConnectTimeout=10 "$REMOTE" \
 for _ in $(seq 1 "$((WAIT / 5))"); do
   sleep 5
   STATE=$(ssh -n -o ConnectTimeout=10 "$REMOTE" \
-    "pgrep -f 'fb_marketplace.py' >/dev/null && echo RUNNING || echo DONE; echo ---; cat $OUT" 2>/dev/null)
-  BODY=${STATE#*---$'\n'}
+    "pgrep -f '[f]b_marketplace.py' >/dev/null && echo RUNNING || echo DONE; echo ---; cat $OUT" 2>/dev/null)
+  # '[f]b_…' — иначе pgrep находит собственную оболочку ssh и задание «вечно RUNNING».
+  # Пустой $OUT: $(...) срезает перевод строки после '---', поэтому режем без него.
+  BODY=${STATE#*---}; BODY=${BODY#$'\n'}
   case "$STATE" in
     DONE*) break;;
   esac
@@ -140,7 +148,7 @@ done
 if [ -z "${BODY:-}" ] || [ -z "${BODY//[[:space:]]/}" ]; then
   echo "FAILED: no JSON after ${WAIT}s. stderr:" >&2
   ssh -n "$REMOTE" "tail -c 400 $ERR" >&2
-  ssh -n "$REMOTE" "pkill -f 'fb_marketplace.py'" 2>/dev/null
+  ssh -n "$REMOTE" "pkill -f '[f]b_marketplace.py'" 2>/dev/null
   echo "hint: check './fb-search.sh --health' and the VNC login" >&2
   exit 1
 fi

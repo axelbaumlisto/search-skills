@@ -249,6 +249,8 @@ def search(query: str, city: str | None, limit: int, lat=None, lng=None,
     cache = json.loads(TEMPLATE.read_text())
     if city:
         key = city.lower()
+        if not CITY_COORDS:
+            raise FbLocalError(f"fb_marketplace.py не найден в {BROWSER_SCRIPTS} (задай FB_BROWSER_SCRIPTS)")
         if key not in CITY_COORDS:
             raise FbLocalError(f"unknown city {city}; known: {', '.join(sorted(CITY_COORDS))}")
         coords = CITY_COORDS[key]
