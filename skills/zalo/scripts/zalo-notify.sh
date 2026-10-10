@@ -7,8 +7,10 @@ Z="$(cd "$(dirname "$0")" && pwd)/zalo.mjs"
 OUT="$(node "$Z" watch "$FILTER" --full 2>/dev/null | grep -v '^#' || true)"
 [ -z "$OUT" ] && exit 0
 echo "$OUT" | grep -q 'НОВОЕ' || exit 0
-cd ~/work/tg_agent/naked
-set -a; source ~/work/tg_agent/.env; set +a
-.venv/bin/python skills/telegram-reader/scripts/tg_send.py --session zverozabr_session send me "Zalo, новое:
+# Отправитель в Telegram — из окружения: TG_SEND_DIR (каталог с .venv и tg_send.py), TG_ENV_FILE, TG_SESSION.
+: "${TG_SEND_DIR:?задай TG_SEND_DIR}" "${TG_ENV_FILE:?задай TG_ENV_FILE}" "${TG_SESSION:?задай TG_SESSION}"
+cd "$TG_SEND_DIR"
+set -a; source "$TG_ENV_FILE"; set +a
+.venv/bin/python skills/telegram-reader/scripts/tg_send.py --session "$TG_SESSION" send me "Zalo, новое:
 $OUT"
 

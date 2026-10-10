@@ -30,7 +30,6 @@ function loadPlaywright() {
   const guesses = [
     process.env.ZALO_NODE_MODULES,
     `${homedir()}/work/search-skills/node_modules`,
-    `${homedir()}/work/naked/node_modules`,
   ].filter(Boolean);
   for (const g of guesses) {
     try { return require(`${g}/playwright`); } catch { /* дальше */ }

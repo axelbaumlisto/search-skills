@@ -132,8 +132,7 @@ ssh "$ZALO_SSH_HOST" 'systemctl --user restart cloak-zalo2'   # поднять
 - **Туннель.** `pgrep -f "9445:127.0.0.1:9444"` — если процесс есть, скрипт его
   переиспользует. Порты берутся из `SKILLS_CONFIG` (`cloakBrowser.cdpRemotePort`,
   `cdpLocalPort`), хост — из `remoteBrowser.sshHost`.
-- **playwright** ищется в `~/work/search-skills/node_modules`, потом в
-  `~/work/naked/node_modules`, потом глобально. Нет — `cd ~/work/search-skills && npm i`.
+- **playwright** ищется в `~/work/search-skills/node_modules`, потом глобально. Нет — `cd ~/work/search-skills && npm i`.
 - **Сессия Zalo Web короткая.** Отдаёт `id.zalo.me/account` с QR — значит вышла.
   Восстановление только руками: открыть `chat.zalo.me` в cloak-браузере через
   VNC и отсканировать QR телефоном. Из скрипта это не решается.
@@ -167,14 +166,14 @@ ssh "$ZALO_SSH_HOST" 'systemctl --user restart cloak-zalo2'   # поднять
 ### Уведомление в Telegram
 
 `scripts/zalo-notify.sh "фильтр"` — если есть новое, шлёт сводку себе в Избранное
-через `tg_agent`. Молчит, когда нового нет. В cron раз в 15 минут:
+через Telegram-отправитель из окружения (`TG_SEND_DIR`, `TG_ENV_FILE`, `TG_SESSION`).
+Молчит, когда нового нет. В cron раз в 15 минут:
 
 ```
 */15 * * * * ~/work/search-skills/skills/zalo/scripts/zalo-notify.sh "Trung,Toàn Phát,Thuỳ Linh"
 ```
 
-Сессия Telegram — `zverozabr_session`; сессия `z` разлогинена, на ней скрипт
-падает с `not authorised`.
+Сессию брать рабочую: с разлогиненной скрипт падает с `not authorised`.
 
 **Ловушка.** Zalo ставит в именах и превью **неразрывные пробелы** (`\u00a0`).
 Без нормализации фильтр по обычному пробелу не совпадает никогда — это уже
