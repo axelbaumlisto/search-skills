@@ -80,6 +80,7 @@ async function runJS(js) {
 async function runFile(name, vars = {}) {
   let js = fs.readFileSync(path.join(__dirname, 'js', `${name}.js`), 'utf8');
   for (const [k, v] of Object.entries(vars)) js = js.split(`__${k}__`).join(v);
+  if (js.includes('__CART_ROWS__')) js = js.split('__CART_ROWS__').join(fs.readFileSync(path.join(__dirname, 'js', '_cart_rows.js'), 'utf8'));
   return runJS(js);
 }
 

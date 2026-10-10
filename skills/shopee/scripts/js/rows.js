@@ -3,22 +3,10 @@
 // without options (a monitor, a single-SKU gadget) silently vanished from the listing
 // and the cart looked emptier than it was.
 (function () {
+  __CART_ROWS__
   const money = /[฿₫]/;
-  const ups = (el) => {
-    let n = el;
-    for (let i = 0; i < 12 && n; i++) {
-      const t = n.innerText || '';
-      if (money.test(t) && t.length > 40) return n;
-      n = n.parentElement;
-    }
-    return null;
-  };
-  const seen = new Set();
   const rows = [];
-  for (const b of document.querySelectorAll('button[aria-label="Increase"]')) {
-    const r = ups(b);
-    if (!r || seen.has(r)) continue;
-    seen.add(r);
+  for (const r of cartRows()) {
     const t = r.innerText.split('\n').map((x) => x.trim()).filter(Boolean);
     const vi = t.indexOf('Variations:');
     const qtyInput = r.querySelector('input[class*="quantity"], .shopee-input-quantity input');
