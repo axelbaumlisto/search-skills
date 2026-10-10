@@ -36,6 +36,9 @@ done
 SSH_OPTS=(-o ConnectTimeout=10 -o ServerAliveInterval=10 -o ServerAliveCountMax=3)
 _lim() { local s="$1"; shift
   if command -v timeout >/dev/null 2>&1; then timeout "$s" "$@"; else perl -e 'alarm shift; exec @ARGV' "$s" "$@"; fi; }
+# Есть ли в тексте что-то кроме пробелов. Подстановка bash «удалить все пробелы из переменной»
+# на мегабайте HTML работает часами — так browse.sh и «зависал».
+has_text() { LC_ALL=C grep -q '[^[:space:]]' <<<"$1"; }  # here-string: с pipefail «printf | grep -q» ловит SIGPIPE и врёт «пусто»
 rssh() { _lim "${RSSH_LIMIT:-60}" ssh -n "${SSH_OPTS[@]}" "$REMOTE" "$@"; }
 rscp() { _lim 60 scp -q "${SSH_OPTS[@]}" "$@"; }
 REMOTE_PY="/tmp/scout-$$.py"
@@ -64,7 +67,7 @@ done
 
 BODY=$(rssh "head -c $((CHARS * 4)) $OUT" 2>/dev/null)
 DIAG=$(rssh "cat $ERR; rm -f $REMOTE_PY $OUT $ERR" 2>/dev/null)
-if [ -z "${BODY//[[:space:]]/}" ]; then
+if ! has_text "$BODY"; then
   echo "FAILED: no content after ${WAIT}s" >&2
   printf '%s\n' "$DIAG" | head -c 500 >&2
   echo "hint: check the browser with ~/.pi/agent/skills/marketplace-search/scripts/fb-search.sh --health" >&2

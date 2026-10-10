@@ -21,6 +21,9 @@ FB="${FB_REMOTE_SCRIPT:-fb_marketplace.py}"   # путь на удалённом
 SSH_OPTS=(-o ConnectTimeout=10 -o ServerAliveInterval=10 -o ServerAliveCountMax=3)
 _lim() { local s="$1"; shift
   if command -v timeout >/dev/null 2>&1; then timeout "$s" "$@"; else perl -e 'alarm shift; exec @ARGV' "$s" "$@"; fi; }
+# Есть ли в тексте что-то кроме пробелов. Подстановка bash «удалить все пробелы из переменной»
+# на мегабайте HTML работает часами — так browse.sh и «зависал».
+has_text() { LC_ALL=C grep -q '[^[:space:]]' <<<"$1"; }  # here-string: с pipefail «printf | grep -q» ловит SIGPIPE и врёт «пусто»
 rssh() { _lim "${RSSH_LIMIT:-60}" ssh -n "${SSH_OPTS[@]}" "$REMOTE" "$@"; }
 rscp() { _lim 60 scp -q "${SSH_OPTS[@]}" "$@"; }
 TAG="fb-$$"
@@ -148,10 +151,10 @@ for _ in $(seq 1 "$((WAIT / 5))"); do
   case "$STATE" in
     DONE*) break;;
   esac
-  [ -n "${BODY//[[:space:]]/}" ] && break
+  has_text "$BODY" && break
 done
 
-if [ -z "${BODY:-}" ] || [ -z "${BODY//[[:space:]]/}" ]; then
+if ! has_text "${BODY:-}"; then
   echo "FAILED: no JSON after ${WAIT}s. stderr:" >&2
   rssh "tail -c 400 $ERR" >&2
   rssh "pkill -f '[f]b_marketplace.py'" 2>/dev/null
