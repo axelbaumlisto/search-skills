@@ -21,11 +21,12 @@ const path = require('path');
  *  `el.click()` даёт isTrusted=false, и React игнорирует его — вариант не выбирается,
  *  корзина не растёт, позиция не удаляется. Обход — полный набор событий
  *  pointerdown → mousedown → pointerup → mouseup → click с координатами.
- *  Проверено 03.10.2026: cart checkboxes и CONFIRM CART на cart.lazada.vn.
+ *  Проверено 03.10.2026: cart checkboxes и CONFIRM CART на cart.lazada.vn;
+ *  08.10.2026: Add to Cart кладёт ровно x1, удаление из корзины работает.
  */
 function realClickInDoc(el) {
   if (!el) return 'no-element';
-  el.click();
+  // Без el.click(): вместе с событием click ниже это два клика — товар ложился в корзину x2.
   const r = el.getBoundingClientRect();
   const opts = { bubbles: true, cancelable: true,
                  clientX: r.x + r.width / 2, clientY: r.y + r.height / 2,
@@ -37,6 +38,9 @@ function realClickInDoc(el) {
   el.dispatchEvent(new MouseEvent('click', opts));
   return 'ok';
 }
+// Исходник клика для вставки в JS страницы: Node-функции там не видны.
+const CLICK_SRC = realClickInDoc.toString();
+
 // Мост к живому Chrome общий с шопи-скиллом. Своей копии не держим: правка
 // в одном месте — работает у обоих.
 const BRIDGE = path.join(process.env.HOME, '.pi/agent/skills/shopee-search/scripts/bridge.cjs');
@@ -287,7 +291,7 @@ async function addToCart(target, { qty = 1 } = {}) {
   await bridge.sleep(6000);
 
   if (qty > 1) {
-    await bridge.runJS(`(function(){
+    await bridge.runJS(`(function(){ ${CLICK_SRC}
       var up = document.querySelector('[class*=next-number-picker-handler-up]');
       if (!up) return 'нет счётчика';
       for (var i = 1; i < ${Number(qty)}; i++) realClickInDoc(up);
@@ -299,7 +303,7 @@ async function addToCart(target, { qty = 1 } = {}) {
   // «Buy Now» рядом и тоже содержит слово «mua»: берём точное совпадение
   // по надписи корзины и никогда — по префиксу класса.
   const labels = JSON.stringify(R.addBtn.filter((t) => t !== 'mua ngay'));
-  const clicked = String(await bridge.runJS(`(function(){
+  const clicked = String(await bridge.runJS(`(function(){ ${CLICK_SRC}
     var want = ${labels};
     var hit = null;
     document.querySelectorAll('button').forEach(function(el){
@@ -330,7 +334,7 @@ async function removeFromCart(pick) {
       .test([i.title, i.variant].filter(Boolean).join(' ')));
   if (!target) throw new Error(`в корзине нет позиции «${pick}»`);
 
-  await bridge.runJS(`(function(){
+  await bridge.runJS(`(function(){ ${CLICK_SRC}
     var rows = document.querySelectorAll('.cart-item');
     var row = rows[${target.index - 1}];
     if (!row) return 'нет строки';
@@ -342,7 +346,7 @@ async function removeFromCart(pick) {
   await bridge.sleep(2500);
   // Удаление всегда спрашивает подтверждение модалкой «Remove from cart»
   // с кнопками REMOVE и CANCEL. Без этого шага позиция остаётся на месте.
-  await bridge.runJS(`(function(){
+  await bridge.runJS(`(function(){ ${CLICK_SRC}
     var want = ${JSON.stringify(R.confirm)};
     var b = Array.prototype.slice.call(document.querySelectorAll('button, a, span[role=button]'))
       .find(function(e){ return want.indexOf((e.innerText||'').trim().toLowerCase()) > -1; });
