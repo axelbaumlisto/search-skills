@@ -25,12 +25,25 @@ function realClick(el) {
 // item or a blocking modal was reported as success. Now the badge is read before the
 // click and handed back, so the caller can verify the cart really grew.
 (function () {
+  /* Badge читается ТРЕМЯ способами, потому что Shopee отдаёт его по-разному в
+     зависимости от локали страницы (EN «items in cart 7», VI «7 sản phẩm trong
+     giỏ»). Раньше здесь был только английский шаблон с числом ПОСЛЕ слов: на
+     вьетнамской локли он не срабатывал, before/after были null, add докладывал
+     «not-added» — и повторные попытки тихо добавляли товар ещё раз (так кабель
+     оказался в корзине в количестве 7). */
   const badge = () => {
-    const m = (document.body.innerText || '').match(/items? in cart\s*(\d+)/i);
+    const el = document.querySelector('[class*="cart-count"], [class*="cartCount"], [class*="CartBadge"], [data-sqe="cart-count"]');
+    const t = el && (el.innerText || '').trim();
+    if (t && /^\d+$/.test(t)) return Number(t);
+    const body = document.body.innerText || '';
+    let m = body.match(/(\d+)\s*(?:items? in cart|sản phẩm trong giỏ|trong giỏ hàng|รายการในตะกร้า)/i);
+    if (m) return Number(m[1]);
+    m = body.match(/items? in cart\s*(\d+)/i);
     return m ? Number(m[1]) : null;
   };
+  // CTA бывает в трёх локалях: VN «Thêm Vào Giỏ Hàng», EN «Add To Cart», TH «เพิ่มลงในตะกร้า».
   const b = [...document.querySelectorAll('button')]
-    .find((x) => /add to cart|thêm vào giỏ/i.test(x.innerText || ''));
+    .find((x) => /^(add to cart|thêm vào giỏ hàng|เพิ่มลงในตะกร้า)$/i.test((x.innerText || '').replace(/\s+/g, ' ').trim()));
   if (!b) return JSON.stringify({ ok: false, reason: 'no-button' });
   if (b.disabled || b.getAttribute('aria-disabled') === 'true') {
     return JSON.stringify({ ok: false, reason: 'button-disabled', before: badge() });

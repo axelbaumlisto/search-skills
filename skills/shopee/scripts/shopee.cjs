@@ -196,8 +196,28 @@ async function add() {
   showTab();
   try {
   await go(url);
+  // Карточки с единственным вариантом часто вообще не рисуют выбор в DOM: ни button,
+  // ни div с selection-box. Проверяем страницу до кликов и, если выбора нет, идём
+  // сразу к кнопке корзины — иначе add падал на «variants not selected».
+  let pageVariantNodes = null;
+  try {
+    const pr = JSON.parse(await runFile('probe_variants'));
+    pageVariantNodes = (pr.rows || []).filter((r) => /selection-box|variation|product-variation/.test(r.cls) || r.unsel).length;
+  } catch { pageVariantNodes = null; }
+  const noVariantUI = pageVariantNodes === 0;
   // one option per call: a single-option tier auto-selects after the first pick, and a
   // second click in the same tick would silently clear it
+  // Ждём, пока кнопки вариантов вообще появятся в DOM: на медленной карточке (и на
+  // страницах в EN-локали) разметка выбора дорисовывается через несколько секунд, и
+  // pick_one честно возвращал 'missing' — add падал на «variants not selected: []».
+  if (want.length) {
+    for (let i = 0; i < 10; i++) {
+      let ready = 0;
+      try { ready = JSON.parse(await runFile('probe_variants')).total || 0; } catch { ready = 0; }
+      if (ready > 0) break;
+      await sleep(1000);
+    }
+  }
   const picked = [];
   for (const label of want) {
     picked.push(`${label}:${await runFile('pick_one', { LABEL: JSON.stringify(label) })}`);
@@ -210,7 +230,10 @@ async function add() {
     await sleep(2000);
     selected = await jsonFile('selected');
   }
-  if (!want.every((l) => selected.includes(l))) throw new Error(`variants not selected: ${JSON.stringify(selected)}`);
+  if (!want.every((l) => selected.includes(l))) {
+    if (noVariantUI) picked.push('no-variant-ui:continue');
+    else throw new Error(`variants not selected: ${JSON.stringify(selected)}`);
+  }
   for (let i = 1; i < qty; i++) { await runFile('step_increase'); await sleep(900); }
   // The click itself proves nothing: Shopee happily renders the button for items it
   // refuses to add. Compare the cart badge before and after, and when it did not grow
@@ -222,9 +245,12 @@ async function add() {
   let after = {};
   try { after = JSON.parse(await runFile('add_result')); } catch { after = {}; }
   const grew = click.before != null && after.after != null && after.after > click.before;
-  const result = grew ? 'added' : 'not-added';
+  /* Тост Shopee — второй законный признак успеха. Без него бейдж, который не
+     прочитался, превращал реальное добавление в «not-added», и повторные
+     попытки копили количество (кабель доехал до qty 7). */
+  const result = grew || after.addedToast ? 'added' : 'not-added';
   const res = { action: 'add', url, variants: picked, selected, qty, result,
-    cart_before: click.before, cart_after: after.after };
+    cart_before: click.before, cart_after: after.after, ...(after.addedToast ? { via: 'toast' } : {}) };
   if (!grew) {
     res.stock = after.stock || null;
     res.sold_out = after.soldOut || null;
@@ -514,6 +540,16 @@ async function cartHeadless() {
   }, { headed: flag('headed') });
 }
 
-const CMDS = { search, item, reviews, orders, order, cart: cartCmd, 'cart-headless': cartHeadless, add, qty, rm };
+/** probe <product-url> — какие узлы карточка считает вариантами (диагностика выбора) */
+async function probe() {
+  const url = argv[1];
+  if (!url) throw new Error('probe needs a product url');
+  await go(url);
+  await sleep(3000);
+  const raw = await runFile('probe_variants');
+  return out(JSON.parse(raw));
+}
+
+const CMDS = { search, item, reviews, orders, order, cart: cartCmd, 'cart-headless': cartHeadless, add, qty, rm, probe };
 (CMDS[cmd] || (async () => { console.error('usage: shopee.cjs search|item|cart …'); process.exit(2); }))()
   .catch((e) => { console.error('FAIL:', e.message); process.exit(1); });
