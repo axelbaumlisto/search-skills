@@ -47,11 +47,16 @@ const OUT = getFlag('--out', join(homedir(), 'Downloads', 'fb-photos'));
 
 // groups/<id> → media/photos; иначе страница → /photos
 let url;
-if (/^groups\/\d+/.test(target)) {
-  const id = target.split('/')[1];
-  url = `https://www.facebook.com/groups/${id}/media/photos`;
-} else if (/^https?:/.test(target)) {
-  url = target.replace(/\/$/, '') + (/photos|media/.test(target) ? '' : '/photos');
+if (/^https?:/.test(target)) {
+  // ссылку пользователя НЕ переписываем: /groups/<slug>/media и /media/photos
+  // ведут на разные вкладки, и вторая у части групп пустая
+  url = target;
+} else if (/^groups\/[^/]+/.test(target)) {
+  // группы: и числовой id, и username-slug (напр. groups/samuhire/media)
+  const rest = target.split('/').slice(1).join('/');
+  url = rest.includes('/')
+    ? `https://www.facebook.com/groups/${rest}`
+    : `https://www.facebook.com/groups/${rest}/media`;
 } else {
   url = `https://www.facebook.com/${target.replace(/^\//, '')}/photos`;
 }
@@ -64,28 +69,107 @@ execSync(`bash ${homedir()}/.pi/agent/skills/browser-scout/scripts/cdp-tunnel.sh
 const browser = await chromium.connectOverCDP(`http://127.0.0.1:${LOCAL}`);
 const page = await browser.contexts()[0].newPage();
 await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
-await page.waitForTimeout(9000);
+await page.waitForTimeout(11000);
 
-// прокрутка: сетка фото ленивая, без скролла в DOM живут только первые 8-12
+// прокрутка: сетка фото ленивая. Скроллим до тех пор, пока прирост не
+// остановится три раунда подряд — у групп и больших страниц сетка длинная.
 const seen = new Map();
-for (let i = 0; i < 14 && seen.size < LIMIT * 3; i++) {
+let stall = 0;
+for (let i = 0; i < 40 && seen.size < LIMIT * 3 && stall < 6; i++) {
   const batch = await page.evaluate(() => {
     const out = [];
-    for (const img of document.querySelectorAll('img')) {
-      const src = img.src || '';
-      if (!/scontent|fbcdn/.test(src)) continue;
-      if (img.naturalWidth < 150 || img.naturalHeight < 150) continue;
-      out.push({ src, w: img.naturalWidth, h: img.naturalHeight });
+    const push = (src, w, h) => {
+      if (!src || !/scontent/.test(src)) return;              // static.xx.fbcdn.net и rsrc.php — это иконки
+      if (/static\.xx\.fbcdn\.net|rsrc\.php/.test(src)) return;
+      if (w && h && (w < 150 || h < 150)) return;
+      out.push({ src, w: w || 0, h: h || 0 });
+    };
+    for (const img of document.querySelectorAll('img')) push(img.src, img.naturalWidth, img.naturalHeight);
+    // сетка групп/страниц часто рисует фото как background-image на div'ах,
+    // а <img> внутри — только плейсхолдер, поэтому собственный фильтр по <img>
+    // давал «фото: 1». Снимаем и css-фоны.
+    for (const el of document.querySelectorAll('[style*="background"]')) {
+      const bg = el.style.backgroundImage || '';
+      const m = bg.match(/url\("?([^")]+)"?\)/);
+      if (m) push(m[1], el.clientWidth, el.clientHeight);
     }
     return out;
   }).catch(() => []);
-  for (const b of batch) if (!seen.has(b.src.split('?')[0])) seen.set(b.src.split('?')[0], b);
-  await page.mouse.wheel(0, 1600);
-  await page.waitForTimeout(1400);
+  const before = seen.size;
+  if (process.env.FB_DEBUG) {
+    const dbg = await page.evaluate(() => ({ imgs: document.querySelectorAll('img').length, title: document.title.slice(0, 50), h: document.body.scrollHeight })).catch(() => ({}));
+    console.error(`  round ${i}: batch=${batch.length} total=${before} imgs=${dbg.imgs} h=${dbg.h} "${dbg.title}"`);
+  }
+  // ключ — путь без query: одно фото приходит в 2-3 размерах (s320/s512), и
+  // полный src давал дубли, а обрезка по '?' раньше склеивала всю сетку в 1-3
+  // записи. Держим самый крупный вариант каждого фото.
+  for (const b of batch) {
+    const key = b.src.split('?')[0];
+    const prev = seen.get(key);
+    if (!prev || (b.w * b.h) > (prev.w * prev.h)) seen.set(key, b);
+  }
+  stall = seen.size === before ? stall + 1 : 0;
+  // медиа-вкладка иногда ждёт «Xem thêm / See more», а не только скролла
+  if (stall >= 2) {
+    await page.evaluate(() => {
+      const btn = [...document.querySelectorAll('div[role="button"],span')]
+        .find(e => /^(Xem thêm|See more)$/i.test((e.innerText || '').trim()));
+      if (btn) btn.click();
+    }).catch(() => {});
+    await page.waitForTimeout(1200);
+  }
+  // mouse.wheel без позиции курсора не прокручивает ленту FB — крутим окно из JS
+  await page.evaluate(() => {
+    window.scrollBy(0, 1600);
+    const sc = [...document.querySelectorAll('div')]
+      .filter(d => d.scrollHeight > d.clientHeight + 200 && d.clientHeight > 300);
+    for (const d of sc.slice(0, 3)) d.scrollTop += 1600;
+  }).catch(() => {});
+  await page.waitForTimeout(1500);
 }
 
-const photos = [...seen.values()].slice(0, LIMIT);
+let photos = [...seen.values()];
+
+// Сетка отдаёт не всё: у части групп/страниц картинки в медиа-вкладке — это
+// обложки альбомов, а сами снимки доступны только по постоянным ссылкам
+// /photo/?fbid=… Поэтому добираем по ним, открывая в той же вкладке.
+if (photos.length < LIMIT) {
+  const links = await page.evaluate(() => [...new Set([...document.querySelectorAll('a[href*="fbid="]')]
+    .map(a => a.href))].slice(0, 40)).catch(() => []);
+  for (const link of links) {
+    if (photos.length >= LIMIT) break;
+    try {
+      await page.goto(link, { waitUntil: 'domcontentloaded', timeout: 45000 });
+      await page.waitForTimeout(2500);
+      const best = await page.evaluate(() => {
+        let top = null;
+        for (const img of document.querySelectorAll('img')) {
+          if (!/scontent/.test(img.src)) continue;
+          const area = img.naturalWidth * img.naturalHeight;
+          if (!top || area > top.area) top = { src: img.src, w: img.naturalWidth, h: img.naturalHeight, area };
+        }
+        return top;
+      }).catch(() => null);
+      if (best && best.w >= 300) {
+        const key = best.src.split('?')[0];
+        if (!seen.has(key)) { seen.set(key, { src: best.src, w: best.w, h: best.h }); photos.push({ ...best }); }
+      }
+    } catch { /* пропускаем битую ссылку */ }
+  }
+  photos = [...seen.values()];
+}
+
+photos = photos.slice(0, LIMIT);
 console.log(`# ${url} — фото: ${photos.length}`);
+if (photos.length < 3) {
+  const why = await page.evaluate(() => {
+    const t = (document.body.innerText || '');
+    if (/log in|Đăng nhập|Join group|Tham gia nhóm/i.test(t)) return 'нужен вход/вступление в группу';
+    if (/This content isn|nội dung này không/i.test(t)) return 'контент скрыт настройками группы';
+    return 'сетка не догрузилась';
+  }).catch(() => '');
+  console.error(`# мало фото: ${why}`);
+}
 if (DOWNLOAD && photos.length) {
   mkdirSync(OUT, { recursive: true });
   let n = 0;

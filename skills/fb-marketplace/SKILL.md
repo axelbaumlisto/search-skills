@@ -48,15 +48,26 @@ node $S/fb-discover.mjs pages "xưởng sản xuất ghế inox"
 
 # вытащить фото работ со страницы или из группы
 node $S/fb-photos.mjs banghephongtra268 --limit 30
+node $S/fb-photos.mjs "https://www.facebook.com/groups/samuhire/media" --limit 20
 node $S/fb-photos.mjs groups/408840490685318 --limit 40
 node $S/fb-photos.mjs banghephongtra268 --download --out /tmp/fb --limit 12
 ```
 
 Что важно знать:
 
-- **Сетка фото ленивая.** `fb-photos.mjs` крутит страницу вниз ~14 раз и на каждом
-  шаге снимает `img` с `scontent|fbcdn` крупнее 150 px; без скролла в DOM живут
-  только первые 8–12 картинок.
+- **Динамический скролл учтён.** `fb-photos.mjs` крутит ленту до 40 раз и
+  останавливается, когда прирост фото не меняется 6 раундов подряд; при застое
+  ещё и нажимает «Xem thêm / See more». Без этого медиа-вкладка отдаёт 1–3 фото.
+- **Берёт и URL как есть.** `.../groups/<slug|id>/media` и `.../photos` — разные
+  вкладки: у части групп `/media/photos` пустая, поэтому ссылку пользователя не
+  переписываем. Понимает и числовой id, и username-slug (`groups/samuhire/media`).
+- **Фото берутся из трёх источников:** `<img src=scontent>`, CSS
+  `background-image` на div'ах (сетка рисуется ими, а `<img>` — плейсхолдер) и
+  постоянные ссылки `/photo/?fbid=…` — по ним скрипт открывает снимок и берёт
+  самый крупный вариант (часто 2048 px вместо 320 px из сетки).
+- **Дедуп по пути без query.** Одно фото приходит в 2–3 размерах (`s320/s512`),
+  дедуп по полному `src` давал дубли, а по `src.split('?')` — склеивал всю сетку
+  в одну запись.
 - **Группа и страница — разные URL фото:** страница `/<slug>/photos`,
   группа `/groups/<id>/media/photos`. Скрипт понимает и `slug`, и `groups/ID`.
 - **Текст постов из выдачи не читается** (`search/posts`) — карточки рендерятся
