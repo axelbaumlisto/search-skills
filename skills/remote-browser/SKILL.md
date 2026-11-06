@@ -49,10 +49,35 @@ playbooks instead of this thin wrapper — they carry per-site recipes:
 ## When every job times out
 
 Symptom: `CDP connect failed: Timeout … ws connected`, or `FAILED: no content`.
+
 Cause seen 2026-10-08: one hung `about:blank` tab — Playwright attaches to every
 page and waits for each. `browse.sh` and `fb-search.sh` now run `scripts/cdp_heal.py`
 first: it closes unresponsive blank tabs and only warns about other hung tabs
 (they may hold a login). Manual run: `ssh <host> python3 /tmp/cdp_heal.py`.
+
+**Hung non-blank tab actually blocks everything** (seen 2026-11-06 with
+`muaban.net`): `cdp_heal` only *warns* about those, connect still times out for
+120 s, every `browse.sh` call fails. Close that one tab by hand — find it, then
+close by full target id (12-char prefix is not enough):
+
+```bash
+ssh <host> 'curl -s http://127.0.0.1:9222/json/list' \
+  | python3 -c "import sys,json;[print(t['id'],t['url'][:60]) for t in json.load(sys.stdin) if t['type']=='page']"
+ssh <host> "curl -s 'http://127.0.0.1:9222/json/close/<FULL_ID>'"
+```
+
+Check logins first: closing a tab with an active session may need a re-login via
+VNC. Scraper tabs (classifieds, marketplaces) are safe to close.
+
+## Sites that block plain HTTP but work in the browser
+
+- **Coupang** (`coupang.com`) — 403 to curl and to the browser session alike; treat
+  as unreachable rather than quoting its prices.
+- **Alibaba** (`www.alibaba.com`) — 410 to curl, but the same product renders on
+  `www.alibaba.co.uk/product-detail/...`, where price tiers and attributes are in
+  plain HTML (product images hide in `"imageList"` JSON, use `s.alicdn.com` URLs).
+- **felix.ru, mebela.ru** — search pages are JS-only; product data comes from the
+  search-engine snippet, not from a direct fetch.
 
 ## Shared-browser etiquette
 
