@@ -86,9 +86,12 @@ const CUR = R.cur;
 const TABS = ['ALL', 'TO_PAY', 'TO_SHIP', 'TO_RECEIVE', 'TO_REVIEW'];
 
 /** Открыть страницу заказов, если браузер не на ней: fetch должен идти с её домена. */
+// Регион проверяем по TLD, а не по слову «lazada»: вкладка lazada.vn проходила
+// проверку и все запросы Таиланда уходили в .vn — API отвечал HTML логина.
+const GOOD_TLD = REGION === 'th' ? '.co.th' : '.vn';
 async function ensurePage() {
   const here = String(await bridge.runJS('location.host')) || '';
-  if (!here.includes('lazada')) {
+  if (!here.endsWith(GOOD_TLD)) {
     await bridge.go(ORDERS_URL, 14000);
     return;
   }

@@ -25,7 +25,7 @@ SESSION=$(val tmuxCdpSession cdp-tunnel)
 # 9223 занят pymobiledevice3 webinspector (работа по айпаду) — берём свой
 LPORT=$(val cdpLocalPort 9224)
 RPORT=$(val cdpRemotePort 9222)
-HOST=$(val sshHost remote-browser)
+HOST=$(val sshHost spex)
 
 # Второй проброс — noVNC: публичный адрес обычно за авторизацией,
 # через туннель экран сервера открывается без неё.

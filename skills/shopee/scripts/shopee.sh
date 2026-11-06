@@ -11,6 +11,7 @@
 #   shopee.sh add <url> --variant "Trắng" --variant "Combo 2 khăn 70x140" --qty 2
 #   shopee.sh qty 0 3                                   # row index -> new quantity
 #   shopee.sh rm 0                                      # delete a cart row
+#   shopee.sh probe <url>                               # диагностика: как карточка рисует варианты
 #   shopee.sh cart-headless          # cart via cookies only (Shopee returns it empty)
 #   shopee.sh --refresh-cookies      # re-export the session from local Chrome
 #   shopee.sh --check                # is the session still logged in?
@@ -78,5 +79,5 @@ case "${1:-}" in
 esac
 
 [ -f "$COOKIES" ] || refresh || exit 1
-case "${1:-}" in search|item|reviews|orders|order|cart|cart-headless|add|qty|rm) ;; *) set -- search "$@";; esac
+case "${1:-}" in search|item|reviews|orders|order|cart|cart-headless|add|qty|rm|probe) ;; *) set -- search "$@";; esac
 NODE_PATH="$NODE_MODULES" node "$HERE/shopee.cjs" "$@"

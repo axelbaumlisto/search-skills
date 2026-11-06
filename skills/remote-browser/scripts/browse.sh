@@ -1,19 +1,19 @@
 #!/usr/bin/env bash
-# Open a URL in the logged-in Chrome on remote-browser and dump readable text / HTML.
+# Open a URL in the logged-in Chrome on spex and dump readable text / HTML.
 # For pages plain fetching cannot reach: Cloudflare walls, login walls, JS
 # shells, click-to-reveal phones on VN classifieds, Facebook/marketplace pages.
 #
 #   browse.sh https://example.com                  # readable text (4000 chars)
 #   browse.sh https://example.com --html           # raw HTML
 #   browse.sh https://example.com --chars 12000
-#   browse.sh https://example.com --shot /tmp/p.png   # PNG stays on remote-browser; path is printed
+#   browse.sh https://example.com --shot /tmp/p.png   # PNG stays on spex; path is printed
 set -uo pipefail
 # Хост задаётся снаружи: BROWSER_SSH_HOST или SKILLS_CONFIG (см. README).
 HOST="${BROWSER_SSH_HOST:-}"
 if [ -z "$HOST" ] && [ -n "${SKILLS_CONFIG:-}" ]; then
   HOST=$(python3 -c "import json,os,sys;p=os.path.expanduser(sys.argv[1]);print(json.load(open(p)).get('remoteBrowser',{}).get('sshHost',''))" "$SKILLS_CONFIG" 2>/dev/null)
 fi
-HOST="${HOST:-remote-browser}"
+HOST="${HOST:-spex}"
 
 
 REMOTE="$HOST"

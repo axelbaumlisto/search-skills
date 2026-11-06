@@ -391,3 +391,18 @@ so the inflation went unnoticed.
 
 `orders` now loads the list by scrolling and accumulating, and reports `visible`
 plus a `note`. For the full history use `orders --query <word>`.
+
+### Карточка без UI выбора варианта (найдено 19.10.2026)
+
+Часть листингов (часто официальные магазины) отдаёт товар с **единственным вариантом**, и
+в DOM тогда нет ни `button`, ни `div.selection-box` — выбирать нечего, но старый `add`
+падал на `variants not selected: []`, хотя кнопка «Add To Cart» на месте.
+
+Что сделано:
+- `pick_one.js` ищет вариант четырьмя способами: точный `aria-label`, окончание
+  `aria-label`, совпадение по тексту, начало текста — и по узлам `button`,
+  `div[role=button]`, `div[class*="selection-box"]`, `div[class*="variation"]`.
+- `add` перед кликами вызывает `probe_variants`; если узлов выбора на странице **ноль**,
+  выбор пропускается и клик идёт сразу в корзину (в ответе будет `no-variant-ui:continue`).
+- Новая диагностическая команда: `shopee.sh probe <url>` — печатает все узлы-кандидаты
+  с тегом, классом, `aria-label` и текстом. Ею и надо начинать, если `add` отбивает вариант.

@@ -25,8 +25,17 @@ function realClick(el) {
 (function () {
   // TH option labels carry a trailing space in aria-label, so compare trimmed
   const label = String(__LABEL__).trim();
-  const b = [...document.querySelectorAll('button')].find((x) => (x.getAttribute('aria-label') || '').trim() === label);
-  if (!b) return 'missing';
-  if (!/unselected/.test(b.className)) return 'already';
-  const res = realClick(b); return res;
+  const all = [...document.querySelectorAll('button, div[role="button"], div[class*="selection-box"], div[class*="variation"] div')];
+  const norm = (s) => String(s || '').replace(/\s+/g, ' ').trim();
+  // 1) точное совпадение aria-label, 2) aria-label содержит метку, 3) текст кнопки = метка
+  let b = all.find((x) => norm(x.getAttribute('aria-label')) === label);
+  if (!b) b = all.find((x) => norm(x.getAttribute('aria-label')).endsWith(label));
+  if (!b) b = all.find((x) => norm(x.innerText) === label || norm(x.textContent) === label);
+  if (!b) b = all.find((x) => norm(x.innerText).startsWith(label) || norm(x.textContent).startsWith(label));
+  if (!b) {
+    const sample = all.map((x) => norm(x.getAttribute('aria-label')) || norm(x.textContent)).filter(Boolean).slice(0, 25);
+    return 'missing:' + JSON.stringify(sample);
+  }
+  if (/unselected/.test(b.className)) { return realClick(b); }
+  return 'already';
 })()
