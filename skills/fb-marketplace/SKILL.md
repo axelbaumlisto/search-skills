@@ -30,6 +30,44 @@ $S/fb-search.sh --detail 28119410014412099                 # description, seller
 $S/fb-search.sh "macbook" bangkok --raw                    # raw JSON
 ```
 
+### Группы, страницы и фото работ (мастерские, цеха)
+
+Marketplace ищет **объявления**, а мастерские живут в **группах и на страницах** —
+именно там выкладывают фото работ. Локальный HTTP-путь такие выдачи не отдаёт,
+поэтому оба скрипта идут через живой Chrome (`--health` покажет, живой ли он).
+
+```bash
+S=~/.pi/agent/skills/marketplace-search/scripts
+
+# найти публичные группы по теме (членов и активность печатает)
+node $S/fb-discover.mjs groups "xưởng bàn ghế inox"
+node $S/fb-discover.mjs groups "nội thất đà nẵng" --limit 15 --json
+
+# найти страницы мастерских (followers, адрес, описание)
+node $S/fb-discover.mjs pages "xưởng sản xuất ghế inox"
+
+# вытащить фото работ со страницы или из группы
+node $S/fb-photos.mjs banghephongtra268 --limit 30
+node $S/fb-photos.mjs groups/408840490685318 --limit 40
+node $S/fb-photos.mjs banghephongtra268 --download --out /tmp/fb --limit 12
+```
+
+Что важно знать:
+
+- **Сетка фото ленивая.** `fb-photos.mjs` крутит страницу вниз ~14 раз и на каждом
+  шаге снимает `img` с `scontent|fbcdn` крупнее 150 px; без скролла в DOM живут
+  только первые 8–12 картинок.
+- **Группа и страница — разные URL фото:** страница `/<slug>/photos`,
+  группа `/groups/<id>/media/photos`. Скрипт понимает и `slug`, и `groups/ID`.
+- **Текст постов из выдачи не читается** (`search/posts`) — карточки рендерятся
+  в shadow-подобной разметке и в innerText дают только «Facebook». Поэтому ищем
+  через группы/страницы, а контент смотрим в их фото-вкладке.
+- Фильтр выдачи берётся из меты карточки: у страниц требуем `followers|người theo
+  dõi`, у групп — `members|thành viên|Public`, иначе в список попадает мусор
+  (люди, хэштеги, реклама).
+- Скрипты принимают хост из `BROWSER_SSH_HOST` или `SKILLS_CONFIG`
+  (`remoteBrowser.sshHost`), CDP-порт — `FB_CDP_REMOTE` (9222).
+
 ### Page reviews (no browser)
 
 ```bash
