@@ -23,31 +23,31 @@ Z=~/.pi/agent/skills/zalo/scripts/zalo.mjs
 
 node $Z list                 # 15 последних диалогов: имя · время · превью
 node $Z list 40
-node $Z read "Hương Giang"   # открыть диалог и выгрузить последние 40 строк
-node $Z read "Trang Ngo" 80
-node $Z read "Lift Team" 60 10   # 3-й аргумент — сколько раз прокрутить историю вверх
+node $Z read "Tên liên hệ"     # открыть диалог и выгрузить послед��ие 40 строк
+node $Z read "Tên liên hệ" 80
+node $Z read "Nhóm dự án" 60 10   # 3-й аргумент — сколько раз прокрутить историю вверх
                                  # (без него виден только последний экран, ~неделя)
 
 # выгрузить ВСЕ картинки чата файлами (чеки, скрины, фото документов)
-node $Z imgs "Lift Team"            # 30 самых свежих → ~/Downloads/zalo/
-node $Z imgs "Lift Team" 10         # только 10 свежих
-ZALO_DOWNLOAD_DIR=/tmp/x node $Z imgs "Lift Team"
+node $Z imgs "Nhóm dự án"            # 30 самых свежих → ~/Downloads/zalo/
+node $Z imgs "Nhóm dự án" 10         # только 10 свежих
+ZALO_DOWNLOAD_DIR=/tmp/x node $Z imgs "Nhóm dự án"
 node $Z search "thuê nhà"    # поиск по сообщениям во всех чатах и группах
 node $Z find "cọc"           # быстрее, но только по превью списка диалогов
 node $Z tabs                 # что открыто в cloak-браузере
 
 # файлы из диалога (с 14.10.2026)
-node $Z files "Khánh Vân Thiên Bình"      # список вложений: имя + размер, свежие сверху
-node $Z get "Khánh Vân Thiên Bình"        # скачать самый свежий -> ~/Downloads/zalo/
+node $Z files "Tên cửa hàng"          # список вложений: имя + размер, свежие сверху
+node $Z get "Tên cửa hàng"            # скачать самый свежий -> ~/Downloads/zalo/
 node $Z get "metal team" 3                # скачать третий сверху
-node $Z text "Trang Ngo" 2                # скачать + напечатать текст вложения
-node $Z text "Trang Ngo" 2 3000           # ограничить вывод 3000 символов
+node $Z text "Tên liên hệ" 2            # скачать + напечатать текст вложения
+node $Z text "Tên liên hệ" 2 3000       # ограничить вывод 3000 символов
 ZALO_DOWNLOAD_DIR=/tmp/x node $Z get "..." # другая папка
 
 # картинки и фото-альбомы (с 27.10.2026)
-node $Z photos "Trang Ngo"                # список фото в видимой части, 1 = самое свежее
-node $Z getimg "Trang Ngo"                # скачать самое свежее фото целиком
-node $Z getimg "Trang Ngo" 2              # второе сверху
+node $Z photos "Tên liên hệ"            # список фото в видимой части, 1 = самое свежее
+node $Z getimg "Tên liên hệ"            # скачать самое свежее фото целиком
+node $Z getimg "Tên liên hệ" 2          # второе сверху
 ZALO_DOWNLOAD_DIR=/tmp/x node $Z getimg "..." # другая папка
 
 ### Грабли, на которые уже наступали
@@ -65,8 +65,8 @@ ZALO_DOWNLOAD_DIR=/tmp/x node $Z getimg "..." # другая папка
 
 # следилка: показывает только НОВОЕ с прошлого запуска
 node $Z watch                                   # по всем чатам
-node $Z watch "Trung,Toàn Phát,Thuỳ Linh"       # только по этим
-node $Z watch "Trung,Toàn Phát" --full          # зайти в чаты и показать живой текст
+node $Z watch "Tên A,Tên B,Tên C"       # только по этим
+node $Z watch "Tên A,Tên B" --full          # зайти в чаты и показать живой текст
 
 # отправка (с 04.10.2026)
 node $Z send "Имя чата" "текст одной строкой"
@@ -76,7 +76,7 @@ node $Z unsend "Имя чата"     # отозвать ПОСЛЕДНЕЕ св�
 
 # второй аккаунт — отдельный профиль cloak-браузера
 node $Z list --acc 2
-node $Z read "Tuấn Hiệp" 40 --acc 2
+node $Z read "Tên liên hệ" 40 --acc 2
 ZALO_ACC=2 node $Z search "tủ bánh"
 ```
 
@@ -278,7 +278,7 @@ ssh "$ZALO_SSH_HOST" 'systemctl --user restart cloak-zalo2'   # поднять
 Молчит, когда нового нет. В cron раз в 15 минут:
 
 ```
-*/15 * * * * ~/work/search-skills/skills/zalo/scripts/zalo-notify.sh "Trung,Toàn Phát,Thuỳ Linh"
+*/15 * * * * ~/work/search-skills/skills/zalo/scripts/zalo-notify.sh "Tên A,Tên B,Tên C"
 ```
 
 Сессию брать рабочую: с разлогиненной скрипт падает с `not authorised`.
@@ -300,8 +300,8 @@ node scripts/zalo.mjs list
 
 ## Ловушки Zalo Web (проверено на живой сессии 30.10.2026)
 
-**Названия чатов содержат невидимые символы** — zero-width space, NBSP. «Diep Chi» в
-списке и искомая строка `Diep Chi` побайтово не равны, поэтому наивное сравнение даёт
+**Названия чатов содержат невидимые символы** — zero-width space, NBSP. Имя с невидимыми символами в
+списке и искомая строка `Tên liên hệ` побайтово не равны, поэтому наивное сравнение даёт
 «диалог не найден», хотя чат есть. Сравнивать после `replace(/[\u200b-\u200f\uFEFF\u00a0]/g,'')`,
 без пробелов и в нижнем регистре.
 

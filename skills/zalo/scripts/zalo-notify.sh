@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Новые сообщения Zalo по списку чатов → себе в Telegram (Избранное).
-# Пример в cron:  */15 * * * * ~/work/search-skills/skills/zalo/scripts/zalo-notify.sh "Trung,Toàn Phát,Thuỳ Linh"
+# Пример в cron:  */15 * * * * ~/work/search-skills/skills/zalo/scripts/zalo-notify.sh "Tên A,Tên B,Tên C"
 set -euo pipefail
 FILTER="${1:-}"
 Z="$(cd "$(dirname "$0")" && pwd)/zalo.mjs"
