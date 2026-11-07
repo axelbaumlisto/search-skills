@@ -5,7 +5,10 @@ description: Read the purchase history of a Lazada Thailand (lazada.co.th) or La
 
 # Lazada TH + VN: orders + catalogue search + cart
 
-Reads from the live, logged-in Chrome.
+Reads from the live, logged-in Chrome. It shares Shopee's hardened bridge: if the
+owner closed the dedicated background window, one command recreates exactly one window
+in the configured profile and restores focus. Failed recreation is explicit, not a later
+misleading `ERR 9001`; no owner tab is ever reused.
 
 **Страна — переменной, не копией скилла.** `LAZADA_REGION=th` (по умолчанию) `| vn`
 выбирает хост, валюту и надписи интерфейса из таблицы `REGIONS` в `lazada.cjs`.

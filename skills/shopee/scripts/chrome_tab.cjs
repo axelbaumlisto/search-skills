@@ -92,7 +92,9 @@ async function ensureTab() {
 
   await giveFocusBack(front);
 
-  if (!id) return 'could not open a bridge window';
+  if (!id) {
+    throw new Error(`bridge: could not open a dedicated background window in Chrome profile "${wantedProfile()}"`);
+  }
   fs.writeFileSync(TABID, id);
   fs.writeFileSync(STATE, id);
   return 'opened a background window';

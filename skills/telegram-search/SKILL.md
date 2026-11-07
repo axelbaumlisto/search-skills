@@ -1,13 +1,14 @@
 ---
 name: telegram-search
 description: Live search across joined Telegram chats and channels (classifieds, city chats, expat groups in Vietnam/Thailand) plus personal DMs. Use when the user wants to find listings, prices, contacts, rentals, second-hand goods, services or discussions inside Telegram — "поищи в телеге", "объявления в телеграме", "что пишут в чатах про X", "найди продавца", "telegram search". Also lists joined channels and downloads files/images from a chat.
-compatibility: macOS/Linux with $TG_HOME pointing at a checkout that has a uv venv and an authorized Telethon session.
+compatibility: macOS/Linux with a checkout that has a uv venv and an authorized Telethon session; set $TG_HOME when it is outside the standard work tree.
 ---
 
 # Telegram search
 
 Live search through the Telegram API (Telethon). No offline index — every call
-hits Telegram, so results are always current.
+hits Telegram, so results are always current. The wrapper auto-discovers a compatible
+checkout under `~/work/*/*`; `TG_HOME` remains the explicit override.
 
 ## Usage
 

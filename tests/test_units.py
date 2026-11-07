@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Unit tests for the pure parts: no network, no session, no browser."""
 import json
+import os
+import subprocess
 import sys
 import unittest
 from pathlib import Path
@@ -76,6 +78,49 @@ class ParseEdges(unittest.TestCase):
     def test_missing_price_is_none_not_crash(self):
         out = g.parse_edges(self.payload({"id": "9", "marketplace_listing_title": "Free bike"}))
         self.assertIsNone(out[0]["price"])
+
+
+class NodeParsers(unittest.TestCase):
+    def node(self, source: str, env=None):
+        p = subprocess.run(["node", "-e", source], cwd=ROOT, env={**os.environ, **(env or {})},
+                           capture_output=True, text=True, check=True)
+        return json.loads(p.stdout)
+
+    def test_shopee_vitem_resolves_real_product(self):
+        out = self.node(r'''const {parseItem}=require('./skills/shopee/scripts/lib.cjs');
+          console.log(JSON.stringify(parseItem({
+            item_identities:['vitem'], shopid:1506174776, itemid:56217701339,
+            real_items:[{shop_id:400502712,item_id:8057038868}],
+            item_data:{item_card_display_price:{price:12300000}},
+            item_card_displayed_asset:{name:'real chair',image:'abc'}
+          })));''', {"SHOPEE_REGION": "vn"})
+        self.assertEqual(out["url"], "https://shopee.vn/product/400502712/8057038868")
+        self.assertEqual(out["price_vnd"], 123)
+        self.assertTrue(out["vitem"])
+
+    def test_lazada_prices_and_portable_bridge(self):
+        out = self.node(r'''const x=require('./skills/lazada/scripts/lazada.cjs');
+          console.log(JSON.stringify({
+            card:x.parseCard({text:'Ghế kem ~ 184.536 ₫ ~ 12 đã bán ~ (9) ~ Đà Nẵng',url:'u'}),
+            portable:x.BRIDGE===x.LOCAL_BRIDGE,
+            product:x.productUrl('abc-i123456789.html')
+          }));''', {"LAZADA_REGION": "vn"})
+        self.assertEqual(out["card"]["price"], 184536)
+        self.assertEqual(out["card"]["sold"], 12)
+        self.assertTrue(out["portable"])
+        self.assertIn("lazada.vn", out["product"])
+
+
+class RuntimeWrappers(unittest.TestCase):
+    def test_telegram_wrapper_no_longer_defaults_to_empty_config(self):
+        text = (ROOT / "skills/telegram-search/scripts/tg-search.sh").read_text()
+        self.assertIn('work/*/*', text)
+        self.assertIn('set TG_HOME', text)
+
+    def test_bridge_failure_is_exception_not_success_string(self):
+        text = (ROOT / "skills/shopee/scripts/chrome_tab.cjs").read_text()
+        self.assertIn('throw new Error(`bridge: could not open', text)
+        self.assertNotIn("return 'could not open a bridge window'", text)
 
 
 class Cities(unittest.TestCase):

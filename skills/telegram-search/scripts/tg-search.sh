@@ -9,14 +9,25 @@
 #   tg-search.sh "nails" --raw                     # full JSON instead of table
 set -uo pipefail
 
-# Каталог проекта с Telethon-сессией — задаётся снаружи.
+# Каталог проекта с Telethon-сессией. Явный TG_HOME всегда главнее; без него
+# ищем стандартную рабочую копию и только затем portable-конфиг. Старый wrapper
+# молча выбирал несуществующий ~/.config/telegram-search и объявлял живой skill мёртвым.
+if [ -z "${TG_HOME:-}" ]; then
+  # The private checkout name is intentionally not embedded in this public skill.
+  for cand in "$HOME"/work/*/* "$HOME/.config/telegram-search"; do
+    if [ -x "$cand/.venv/bin/python" ] && [ -f "$cand/skills/telegram-reader/scripts/telegram_reader.py" ]; then
+      TG_HOME="$cand"; break
+    fi
+  done
+fi
 TG_HOME="${TG_HOME:-$HOME/.config/telegram-search}"
 PY="$TG_HOME/.venv/bin/python"
 TR="$TG_HOME/skills/telegram-reader/scripts/telegram_reader.py"
 
-[ -x "$PY" ] || { echo "no venv at $PY — see $TG_HOME/skills/RUNBOOK-local.md" >&2; exit 2; }
-TG_ENV="${TG_ENV:-$TG_HOME/.env}"
-[ -f "$TG_ENV" ] || { echo "missing $TG_ENV — set TG_ENV or TG_HOME" >&2; exit 2; }
+[ -x "$PY" ] || { echo "telegram runtime not found; set TG_HOME to a checkout with .venv and telegram-reader" >&2; exit 2; }
+TG_ENV="${TG_ENV:-$(dirname "$TG_HOME")/.env}"
+[ -f "$TG_ENV" ] || TG_ENV="$TG_HOME/.env"
+[ -f "$TG_ENV" ] || { echo "telegram env not found; set TG_ENV explicitly" >&2; exit 2; }
 
 QUERY=""; ACCOUNT="research"; LIMIT=20; DIALOGS=200; RAW=0; BATCH=""; MODE="search"
 CHANNEL=""; DATE_FROM=""; DATE_TO=""
