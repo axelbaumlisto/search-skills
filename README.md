@@ -1,10 +1,9 @@
 # search-skills
 
-Three agent skills for **live** search on platforms that have no usable public API:
-Shopee Vietnam, Facebook Marketplace and Telegram. Each one drives *your own*
-logged-in session, returns structured JSON, and documents the anti-bot walls it
-had to get through — so an LLM agent (or you) can ask "what does this cost here,
-who sells it, and what do buyers complain about" and get a real answer.
+Agent skills for **live** search, commerce, places, Gmail drafts and payment QR.
+Session-backed adapters drive *your own* logged-in account; public-source adapters
+use official APIs or store endpoints. All private tokens, cookies, sessions and
+machine configuration stay outside this repository.
 
 | Skill | What it answers | How |
 |---|---|---|
@@ -14,6 +13,13 @@ who sells it, and what do buyers complain about" and get a real answer.
 | [fb-marketplace](skills/fb-marketplace/SKILL.md) | second-hand prices in a specific city, seller listings, Page reviews | plain HTTP replay of the Marketplace GraphQL query |
 | [telegram-search](skills/telegram-search/SKILL.md) | what people actually post in local chats: listings, contacts, rentals | Telethon over your joined chats |
 | [listing-monitor](skills/listing-monitor/SKILL.md) | keep watching VN classifieds (rentals, used bikes, anything) and get only new matches in Telegram | Chợ Tốt API + Facebook + Telegram + muaban, one TOML per search, uv + pytest |
+| [google-places](skills/google-places/SKILL.md) | physical shops, ratings, phones, opening hours | official Places API through an external runtime |
+| [homepro-th](skills/homepro-th/SKILL.md) / [globalhouse-th](skills/globalhouse-th/SKILL.md) | Thai shelf prices for home/building goods | official store endpoints, no marketplace |
+| [meta-vn](skills/meta-vn/SKILL.md) | Vietnam kitchen equipment prices and specifications | public catalogue HTML |
+| [gmail](skills/gmail/SKILL.md) | read mail and prepare drafts, never send | official Gmail API, restricted OAuth scopes |
+| [vietqr](skills/vietqr/SKILL.md) | render Vietnamese bank transfer QR | official VietQR image service |
+| [threads](skills/threads/SKILL.md) | current public discussions and controlled publishing | official Threads API |
+| [suppliers-vn](skills/suppliers-vn/SKILL.md) / [search-agent](skills/search-agent/SKILL.md) | route supplier and multi-source local searches | composes sibling skills |
 
 No scraping farm, no proxies, no account farms: every skill is a thin, paced
 wrapper around a session you already have. (A separate secondary account for

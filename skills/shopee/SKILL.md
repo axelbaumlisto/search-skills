@@ -56,9 +56,9 @@ sold_month, rating, liked, shop, location, sold_out, url`.
 
 ## Hard-won rules
 
-- **The bridge must live in the Chrome profile that holds the Shopee session.** The owner
-  runs two profiles (personal `Aleksandr`, work `Aleksandr (gene.com)`), and AppleScript's
-  `make new window` opens in whichever profile Chrome used last. A bridge born in the wrong
+- **The bridge must live in the Chrome profile that holds the Shopee session.** Many users
+  run separate personal and work profiles, and AppleScript's `make new window` opens in
+  whichever profile Chrome used last. A bridge born in the wrong
   one is logged out (`/verify/traffic/error?...is_logged_in=false`) and, because
   *Allow JavaScript from Apple Events* is a **per-profile** switch, every job dies with
   `bridge: job timeout`. `bridge_server.applescript` spawns its window through

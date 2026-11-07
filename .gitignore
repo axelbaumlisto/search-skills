@@ -2,6 +2,10 @@ node_modules
 __pycache__/
 *.pyc
 .env
+*.env
+**/credentials.json
+**/token.json
+**/*token*.json
 *.session*
 *.lock
 *.cookies.txt

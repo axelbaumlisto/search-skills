@@ -10,7 +10,9 @@ warn() { printf 'WARN  %-18s %s\n' "$1" "$2"; warn=$((warn+1)); }
 bad()  { printf 'FAIL  %-18s %s\n' "$1" "$2"; fail=$((fail+1)); }
 
 if "$ROOT/tests/run.sh" >/tmp/search-skills-offline-health.log 2>&1; then
-  ok offline "108 tests + syntax + secret scan"
+  count=$(grep -Eo '[0-9]+ passed' /tmp/search-skills-offline-health.log | awk '{n+=$1} END{print n+0}')
+  units=$(grep -Eo 'Ran [0-9]+ tests' /tmp/search-skills-offline-health.log | awk '{n+=$2} END{print n+0}')
+  ok offline "$((count + units)) tests + syntax + secret scan"
 else
   bad offline "see /tmp/search-skills-offline-health.log"
 fi

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Unit tests for the pure parts: no network, no session, no browser."""
+import importlib.util
 import json
 import os
 import subprocess
@@ -109,6 +110,55 @@ class NodeParsers(unittest.TestCase):
         self.assertEqual(out["card"]["sold"], 12)
         self.assertTrue(out["portable"])
         self.assertIn("lazada.vn", out["product"])
+
+
+def load_module(name: str, path: Path):
+    spec = importlib.util.spec_from_file_location(name, path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+class PortableSkills(unittest.TestCase):
+    def test_homepro_structured_parser(self):
+        hp = load_module("hp_skill", ROOT / "skills/_thai_shared/hp.py")
+        body = json.dumps({"items": [{
+            "partnumber": "1234567", "item_name": "สินค้า", "item_name_en": "PRODUCT",
+            "price_display": '<span class="normal-price">3,100</span><span class="reduced-price"><span>1,790</span></span>',
+            "brand": "ACME",
+        }]})
+        row = hp.parse_suggest(body)[0]
+        self.assertEqual((row["price"], row["original_price"]), (1790, 3100))
+        self.assertEqual(row["url"], "https://www.homepro.co.th/p/1234567")
+
+    def test_vietqr_pure_functions(self):
+        vq = load_module("vietqr_skill", ROOT / "skills/vietqr/scripts/vietqr.py")
+        self.assertEqual(vq.deaccent("Thanh toán Đà Nẵng"), "Thanh toan Da Nang")
+        self.assertEqual(vq.resolve_bank("bidv"), "970418")
+        url = vq.build("970418", "0123456789", "1,500,000", "TT hóa đơn", "Công ty", "compact2")
+        self.assertIn("amount=1500000", url)
+        self.assertNotIn("ó", url)
+
+    def test_gmail_defaults_to_xdg_and_has_no_send_scope(self):
+        p = (ROOT / "skills/gmail/scripts/gmail.py").read_text()
+        self.assertIn('".config" / "pi-skills" / "gmail"', p)
+        self.assertNotIn("messages().send", p)
+        self.assertNotIn("messages.send", p)
+        self.assertNotIn('add_parser("send")', p)
+        self.assertNotIn(".adloop", p)
+
+    def test_vietqr_examples_are_generic(self):
+        for f in (ROOT / "skills/vietqr/SKILL.md", ROOT / "skills/vietqr/scripts/vietqr.py"):
+            p = f.read_text()
+            self.assertNotIn("SO" + "VA", p)
+            self.assertNotIn("0402" + "348439", p)
+            self.assertIn("ACME", p)
+
+    def test_places_runtime_is_discovered_not_hardcoded(self):
+        p = (ROOT / "skills/google-places/scripts/places.sh").read_text()
+        self.assertIn("PLACES_HOME", p)
+        self.assertIn('work/*/*', p)
+        self.assertNotIn("tg" + "_agent", p)
 
 
 class RuntimeWrappers(unittest.TestCase):

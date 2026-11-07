@@ -3,3 +3,6 @@ telethon>=1.36
 # facebook: stdlib only (urllib + http.cookiejar) — nothing to install
 # shopee cookie export: stdlib + pycryptodome for the AES-128-CBC Chrome cookie blob
 pycryptodome>=3.20
+# gmail
+Google-API-Python-Client>=2.0
+google-auth-oauthlib>=1.2

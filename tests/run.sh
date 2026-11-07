@@ -35,8 +35,13 @@ fi
 echo "== no secrets / no machine paths in tracked files"
 # Сам этот файл содержит искомый шаблон, поэтому исключён — иначе тест
 # всегда падал на собственной строке.
-if git -C "$ROOT" ls-files -z -- ':!tests/run.sh' | xargs -0 grep -nE '/Users/|/home/[a-z]|tg_agent|naked/|c_user=|xs=[A-Za-z0-9]|api_hash *= *[0-9a-f]{32}' ; then
-  echo "  FAIL: leaked path or credential above"; fail=1
+if git -C "$ROOT" ls-files -z -- ':!tests/run.sh' | xargs -0 grep -nE '/Users/|/home/[a-z]|tg_agent|naked/|c_user=|xs=[A-Za-z0-9]|api_hash *= *[0-9a-f]{32}|0402348439|SOVA|It5IG@|Sova@' ; then
+  echo "  FAIL: leaked path, identity or credential above"; fail=1
+fi
+
+# Token/cookie/session files must never be tracked even if a future .gitignore regresses.
+if git -C "$ROOT" ls-files | grep -Ei '(^|/)(credentials|token|cookies?|session)(\.|/|$).*(json|txt|session|env)$|\.env$'; then
+  echo "  FAIL: tracked credential-like file above"; fail=1
 fi
 
 [ "$fail" = 0 ] && echo "ALL OK" || echo "FAILURES"
