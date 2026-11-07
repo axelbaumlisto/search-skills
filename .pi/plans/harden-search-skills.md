@@ -22,7 +22,7 @@ Add deterministic offline health/tests first, then self-heal session-dependent a
 ### Task 3: Repair Telegram runtime discovery
 **Files:** `skills/telegram-search/scripts/tg-search.sh`, `skills/telegram-search/SKILL.md`
 **Depends:** Task 1
-**Acceptance:** auto-discovers the documented local tg_agent checkout/venv/session and produces a clear auth/runtime diagnostic.
+**Acceptance:** auto-discovers a compatible local checkout/venv/session and produces a clear auth/runtime diagnostic.
 **Verify:** offline tests + bounded live search.
 
 ### Task 4: Restore HomePro or provide robust fallback
