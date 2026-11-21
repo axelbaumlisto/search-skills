@@ -41,12 +41,15 @@ function realClickInDoc(el) {
 // Исходник клика для вставки в JS страницы: Node-функции там не видны.
 const CLICK_SRC = realClickInDoc.toString();
 
-// Мост к живому Chrome общий с шопи-скиллом. В checkout берём соседний
-// skill; fallback нужен только для раздельной установки через ~/.pi. Старый
-// абсолютный путь делал Lazada непереносимой и ломал тесты вне машины автора.
+// Браузер общий с шопи-скиллом, и берём его через browser.cjs — единственное
+// место, где выбирается подложка: живой Chrome владельца (по умолчанию) или
+// браузер на сервере (SHOPEE_BROWSER=remote). Раньше здесь требовался bridge.cjs
+// напрямую, и Lazada не могла уйти с машины владельца: даже поиск, которому вход
+// не нужен, открывал окно в его Chrome. В checkout берём соседний skill;
+// fallback нужен только для раздельной установки через ~/.pi.
 const fs = require('fs');
-const LOCAL_BRIDGE = path.resolve(__dirname, '../../shopee/scripts/bridge.cjs');
-const INSTALLED_BRIDGE = path.join(process.env.HOME || '', '.pi/agent/skills/shopee-search/scripts/bridge.cjs');
+const LOCAL_BRIDGE = path.resolve(__dirname, '../../shopee/scripts/browser.cjs');
+const INSTALLED_BRIDGE = path.join(process.env.HOME || '', '.pi/agent/skills/shopee-search/scripts/browser.cjs');
 const BRIDGE = fs.existsSync(LOCAL_BRIDGE) ? LOCAL_BRIDGE : INSTALLED_BRIDGE;
 if (!fs.existsSync(BRIDGE)) throw new Error('Shopee shared Chrome bridge is not installed');
 const bridge = require(BRIDGE);

@@ -10,8 +10,8 @@
 # без обращений — чтобы на ноутбуке не копилась память между задачами.
 set -uo pipefail
 
-NAME="${SHOPEE_CONTAINER:-clicker-test}"
-PORT="${SHOPEE_CDP_PORT:-9350}"
+NAME="${SHOPEE_CONTAINER:-market-browser}"
+PORT="${SHOPEE_CDP_PORT:-9360}"
 IDLE_MIN="${SHOPEE_CONTAINER_IDLE_MIN:-10}"
 STATE_DIR="$HOME/.cache/search-skills"
 STATE="$STATE_DIR/container-browser.json"
@@ -41,12 +41,12 @@ case "${1:-status}" in
       cdp_alive || { [ "$(idle_seconds)" -gt 300 ] && { rm -f "$PIDFILE"; exit 0; }; continue; }
       if [ "$(idle_seconds)" -ge $((IDLE_MIN * 60)) ]; then
         echo "$(date '+%F %T') простой ${IDLE_MIN}м — гашу браузер в $NAME"
-        docker exec "$NAME" sh -c "pkill -f 'remote-debugging-port=$PORT' || true" >/dev/null 2>&1
+        docker exec "$NAME" /usr/local/bin/entrypoint.sh stop >/dev/null 2>&1
       fi
     done
     ;;
   stop)
-    docker exec "$NAME" sh -c "pkill -f 'remote-debugging-port=$PORT' || true" >/dev/null 2>&1
+    docker exec "$NAME" /usr/local/bin/entrypoint.sh stop >/dev/null 2>&1
     echo "браузер погашен"
     ;;
   status)

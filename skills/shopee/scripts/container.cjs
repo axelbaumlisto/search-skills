@@ -28,10 +28,10 @@ const { execFileSync } = require('child_process');
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-const NAME = process.env.SHOPEE_CONTAINER || 'clicker-test';
-const PORT = Number(process.env.SHOPEE_CDP_PORT || 9350);
+const NAME = process.env.SHOPEE_CONTAINER || 'market-browser';
+const PORT = Number(process.env.SHOPEE_CDP_PORT || 9360);
 const CDP = `http://127.0.0.1:${PORT}`;
-const PROFILE = process.env.SHOPEE_CONTAINER_PROFILE || '/config/market-profile';
+const PROFILE = process.env.SHOPEE_CONTAINER_PROFILE || '/data/profile';
 const IDLE_MIN = Number(process.env.SHOPEE_CONTAINER_IDLE_MIN || 10);
 const CHROME = '/usr/bin/chromium';
 const STATE_DIR = path.join(os.homedir(), '.cache', 'search-skills');
@@ -74,12 +74,10 @@ async function start() {
   // отказывается стартовать («Running as root without --no-sandbox»).
   // --headless=new: окна нет, значит нет ни фокуса, ни зависимости от
   // того, разблокирован ли экран мака.
-  const cmd = `( ${CHROME} --headless=new --no-sandbox --disable-gpu`
-    + ` --remote-debugging-port=${PORT} --remote-debugging-address=0.0.0.0`
-    + ` --user-data-dir=${PROFILE} --no-first-run --no-default-browser-check`
-    + ` about:blank >/tmp/market-chromium.log 2>&1 & )`;
+  // Флаги запуска живут в entrypoint.sh образа: одна точка правды, иначе
+  // скилл и контейнер разъедутся в аргументах.
   try {
-    docker(['exec', NAME, 'sh', '-c', cmd]);
+    docker(['exec', '-d', NAME, '/usr/local/bin/entrypoint.sh', 'browser']);
   } catch (e) {
     throw new Error(`контейнер ${NAME} недоступен: ${String(e.message || e).slice(0, 120)}`);
   }
@@ -95,7 +93,7 @@ async function stop() {
   if (_page && !_page.isClosed()) await _page.close().catch(() => {});
   if (_browser) await _browser.close().catch(() => {});
   _browser = null; _page = null;
-  try { docker(['exec', NAME, 'sh', '-c', `pkill -f "remote-debugging-port=${PORT}" || true`]); } catch { /* уже нет */ }
+  try { docker(['exec', NAME, '/usr/local/bin/entrypoint.sh', 'stop']); } catch { /* уже нет */ }
   for (let i = 0; i < 10; i++) {
     if (!(await cdpAlive(800))) return 'stopped';
     await sleep(300);

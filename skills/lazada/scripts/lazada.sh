@@ -12,5 +12,7 @@
 #   lazada.sh add "<url|pdp-id>" --qty 2    # положить товар в корзину
 #
 # Chrome должен быть запущен и залогинен на lazada.co.th / lazada.vn; страница откроется сама.
+# Поиску вход не нужен: SHOPEE_BROWSER=remote lazada.sh search … — браузер на сервере,
+# окно в Chrome владельца не открывается и фокус не трогается.
 set -euo pipefail
 exec node "$(dirname "$0")/cli.cjs" "$@"

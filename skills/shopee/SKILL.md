@@ -416,12 +416,17 @@ Shopee и Lazada водят ОДНО живое окно Chrome (мост `bridg
 Правило: в одном батче либо shopee-лейн, либо lazada-лейн; параллельно с ними — только
 веб/веб-поиск без браузера.
 
-## Подложка `container`: Chromium внутри контейнера кликера
+## Подложка `container`: свой контейнер под маркетплейсы
 
 `SHOPEE_BROWSER=container` — третий драйвер рядом с `bridge` и `remote`.
-Браузер живёт в уже существующем контейнере `clicker-test` (там же, где
-Citrix), поэтому переносится на любую машину с docker и ничего не держит на
-хосте.
+Браузер живёт в отдельном контейнере `market-browser` (проект
+`~/work/market-browser`), не в контейнере кликера Citrix.
+
+**Почему именно отдельный контейнер.** Сторож кликера (`supervisor.py`,
+`chrome_running()`) считает зависшим любой процесс с аргументом `chromium --`,
+у которого нет окна, и снимает его через `pkill -9`. Headless-браузер под это
+правило попадает всегда, поэтому в `clicker-test` он жил ровно до следующего
+тика сторожа.
 
 ```bash
 SHOPEE_BROWSER=container shopee-th.sh search "กรงเดินทาง IATA" --limit 20
@@ -438,18 +443,28 @@ shopee/scripts/container-browser.sh stop     # погасить сейчас
 - **блокировка экрана.** Мост зависел от того, видима ли вкладка: при
   заблокированном маке `document.visibilityState` = `hidden`, SPA не
   гидрировалась, и запись в корзину молча не срабатывала. Headless-браузер
-  в контейнере всегда `visible`;
-- **память.** Живёт 300–400 МБ и только пока нужен: `container-browser.sh watch`
-  гасит его после `SHOPEE_CONTAINER_IDLE_MIN` минут без обращений (по умолчанию
-  10). Профиль лежит на volume, вход не теряется.
+  всегда `visible`;
+- **память.** Контейнер поднимается один раз и живёт, Chromium внутри не
+  перезапускается на каждый запрос. Гасится либо `container-browser.sh`
+  после `SHOPEE_CONTAINER_IDLE_MIN` минут тишины (по умолчанию 10), либо
+  вручную. Профиль лежит на volume, вход не теряется.
 
-Настройки: `SHOPEE_CONTAINER` (имя контейнера), `SHOPEE_CDP_PORT` (9350),
-`SHOPEE_CONTAINER_PROFILE` (`/config/market-profile`),
-`SHOPEE_CONTAINER_IDLE_MIN`. Контейнер должен быть с `network_mode: host` —
-тогда CDP виден на хосте напрямую, без проброса портов.
+Настройки: `SHOPEE_CONTAINER` (`market-browser`), `SHOPEE_CDP_PORT` (9360),
+`SHOPEE_CONTAINER_PROFILE` (`/data/profile`), `SHOPEE_CONTAINER_IDLE_MIN`.
+Контейнер с `network_mode: host` — CDP виден на хосте напрямую, и IP тот же,
+что у машины (иначе Shopee/Lazada просят логин заново).
 
-Проверено 21.11.2026: Lazada TH отдаёт поиск и карточки; Shopee TH с новым
-профилем упирается в `/verify/traffic/error` — куки из
-`~/.config/shopee-search/cookies/shopee_th.cookies.txt` заливаются в профиль,
-но подхватываются только после перезапуска браузера, а надёжнее один раз
-войти руками через GUI порта 3010 (он же профиль `Default` хоста).
+**Профиль с мака.** Сессия привязана к профилю и IP, поэтому в контейнер
+кладётся копия профиля Chrome с хоста:
+
+```bash
+cd ~/work/market-browser && ./import-profile.sh Default alexander.prilipko@gmail.com
+```
+
+Chrome при этом должен быть закрыт. Если `Cookies` не скопировались —
+у процесса нет Full Disk Access: Системные настройки → Конфиденциальность →
+Полный доступ к диску → добавить терминал/pi и перезапустить.
+
+Проверено 21.11.2026: Lazada TH отдаёт поиск и карточки из контейнера.
+Shopee TH без профиля упирается в `/verify/traffic/error`
+(`is_logged_in=false`) — нужен импорт профиля или разовый вход руками.
