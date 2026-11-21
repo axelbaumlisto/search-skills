@@ -451,20 +451,21 @@ shopee/scripts/container-browser.sh stop     # погасить сейчас
 
 Настройки: `SHOPEE_CONTAINER` (`market-browser`), `SHOPEE_CDP_PORT` (9360),
 `SHOPEE_CONTAINER_PROFILE` (`/config/.config/chromium` — профиль GUI-браузера, тот же, в который владелец входит руками), `SHOPEE_CONTAINER_IDLE_MIN`.
-Контейнер с `network_mode: host` — CDP виден на хосте напрямую, и IP тот же,
-что у машины (иначе Shopee/Lazada просят логин заново).
+Топология по факту (21.11.2026): **bridge-сеть** с пробросом `3011:3000`
+(GUI, selkies) и `9360:9224` (CDP). В host-режиме selkies упирается в порт
+8082, занятый OrbStack. Профиль `/config/.config/chromium` на volume —
+владелец входит руками через GUI :3011, сессии переживают пересоздание
+контейнера (куки из старых экспортов не подхватываются).
 
-**Профиль с мака.** Сессия привязана к профилю и IP, поэтому в контейнер
-кладётся копия профиля Chrome с хоста:
+Грабли сборки:
+- Chromium игнорирует `--remote-debugging-address=0.0.0.0` и слушает CDP
+  только на 127.0.0.1 — в образе TCP-релей `9224 -> 9223`
+  (`root/custom-cont-init.d/10-cdp-relay`);
+- custom-init обязан завершаться: релей через `exec` блокировал s6, nginx и
+  рабочий стол не стартовали. Релей уходит в `nohup ... &`;
+- Google-логин в Chromium ограничен (настоящий Chrome под Linux — только
+  amd64, машина arm64). Для Shopee/Lazada не мешает: вход по телефону/почте.
 
-```bash
-cd ~/work/market-browser && ./import-profile.sh Default alexander.prilipko@gmail.com
-```
-
-Chrome при этом должен быть закрыт. Если `Cookies` не скопировались —
-у процесса нет Full Disk Access: Системные настройки → Конфиденциальность →
-Полный доступ к диску → добавить терминал/pi и перезапустить.
-
-Проверено 21.11.2026: Lazada TH отдаёт поиск и карточки из контейнера.
-Shopee TH без профиля упирается в `/verify/traffic/error`
-(`is_logged_in=false`) — нужен импорт профиля или разовый вход руками.
+Проверено 21.11.2026: Shopee TH/VN и Lazada TH/VN залогинены через GUI,
+поиск из скилла отдаёт карточки на обеих площадках, сессии пережили
+перезапуск контейнера.
