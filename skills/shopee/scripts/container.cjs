@@ -31,7 +31,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const NAME = process.env.SHOPEE_CONTAINER || 'market-browser';
 const PORT = Number(process.env.SHOPEE_CDP_PORT || 9360);
 const CDP = `http://127.0.0.1:${PORT}`;
-const PROFILE = process.env.SHOPEE_CONTAINER_PROFILE || '/data/profile';
+const PROFILE = process.env.SHOPEE_CONTAINER_PROFILE || '/config/.config/chromium';
 const IDLE_MIN = Number(process.env.SHOPEE_CONTAINER_IDLE_MIN || 10);
 const CHROME = '/usr/bin/chromium';
 const STATE_DIR = path.join(os.homedir(), '.cache', 'search-skills');

@@ -450,7 +450,7 @@ shopee/scripts/container-browser.sh stop     # погасить сейчас
   вручную. Профиль лежит на volume, вход не теряется.
 
 Настройки: `SHOPEE_CONTAINER` (`market-browser`), `SHOPEE_CDP_PORT` (9360),
-`SHOPEE_CONTAINER_PROFILE` (`/data/profile`), `SHOPEE_CONTAINER_IDLE_MIN`.
+`SHOPEE_CONTAINER_PROFILE` (`/config/.config/chromium` — профиль GUI-браузера, тот же, в который владелец входит руками), `SHOPEE_CONTAINER_IDLE_MIN`.
 Контейнер с `network_mode: host` — CDP виден на хосте напрямую, и IP тот же,
 что у машины (иначе Shopee/Lazada просят логин заново).
 
