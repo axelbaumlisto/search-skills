@@ -415,3 +415,41 @@ Shopee и Lazada водят ОДНО живое окно Chrome (мост `bridg
 таймауту 30 минут, тогда как одиночный `lazada-vn.sh search` отвечает за 20 с.
 Правило: в одном батче либо shopee-лейн, либо lazada-лейн; параллельно с ними — только
 веб/веб-поиск без браузера.
+
+## Подложка `container`: Chromium внутри контейнера кликера
+
+`SHOPEE_BROWSER=container` — третий драйвер рядом с `bridge` и `remote`.
+Браузер живёт в уже существующем контейнере `clicker-test` (там же, где
+Citrix), поэтому переносится на любую машину с docker и ничего не держит на
+хосте.
+
+```bash
+SHOPEE_BROWSER=container shopee-th.sh search "กรงเดินทาง IATA" --limit 20
+SHOPEE_BROWSER=container lazada.sh search "กรงเดินทาง IATA"
+shopee/scripts/container-browser.sh status   # жив/погашен + простой
+shopee/scripts/container-browser.sh stop     # погасить сейчас
+```
+
+Что решает:
+
+- **фокус.** Chromium запускается `--headless=new`, окна нет — значит нечего
+  выдёргивать на передний план. Раньше каждое создание окна моста поднимало
+  Chrome владельца примерно на секунду, и это повторялось на каждый поиск;
+- **блокировка экрана.** Мост зависел от того, видима ли вкладка: при
+  заблокированном маке `document.visibilityState` = `hidden`, SPA не
+  гидрировалась, и запись в корзину молча не срабатывала. Headless-браузер
+  в контейнере всегда `visible`;
+- **память.** Живёт 300–400 МБ и только пока нужен: `container-browser.sh watch`
+  гасит его после `SHOPEE_CONTAINER_IDLE_MIN` минут без обращений (по умолчанию
+  10). Профиль лежит на volume, вход не теряется.
+
+Настройки: `SHOPEE_CONTAINER` (имя контейнера), `SHOPEE_CDP_PORT` (9350),
+`SHOPEE_CONTAINER_PROFILE` (`/config/market-profile`),
+`SHOPEE_CONTAINER_IDLE_MIN`. Контейнер должен быть с `network_mode: host` —
+тогда CDP виден на хосте напрямую, без проброса портов.
+
+Проверено 21.11.2026: Lazada TH отдаёт поиск и карточки; Shopee TH с новым
+профилем упирается в `/verify/traffic/error` — куки из
+`~/.config/shopee-search/cookies/shopee_th.cookies.txt` заливаются в профиль,
+но подхватываются только после перезапуска браузера, а надёжнее один раз
+войти руками через GUI порта 3010 (он же профиль `Default` хоста).

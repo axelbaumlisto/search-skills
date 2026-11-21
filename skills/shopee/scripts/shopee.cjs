@@ -2,7 +2,12 @@
 /** Shopee CLI: search / item / cart. Region via SHOPEE_REGION=vn|th (regions.cjs).
  *  See SKILL.md for the anti-bot rules. */
 const { R, withPage, captureJson, parseItem, money } = require(`${__dirname}/lib.cjs`);
-const { runJS, runFile, json, jsonFile, go, autoScroll, sleep, showTab, hideTab } = require(`${__dirname}/browser.cjs`);
+const BROWSER = require(`${__dirname}/browser.cjs`);
+const { runJS, runFile, json, jsonFile, go, autoScroll, sleep, showTab, hideTab } = BROWSER;
+// В своём браузере (сервер, контейнер) отрисованный DOM достоверен: скрытых
+// вкладок там нет. У моста в Chrome владельца — наоборот, поэтому для него
+// остаётся отдельный живой режим.
+const DOM_SAFE = !!BROWSER.domSafe;
 
 const argv = process.argv.slice(2);
 const cmd = argv[0];
@@ -103,7 +108,8 @@ async function search() {
   if (!keyword) throw new Error('search needs a keyword');
   const sort = val('sort', 'relevancy'); const min = val('min'); const max = val('max');
   const limit = Number(val('limit', 20)); const page0 = Number(val('page', 0));
-  if ((R.searchLive && !flag('headless')) || flag('live')) return liveSearch(keyword, sort, min, max, limit, page0);
+  const domOK = DOM_SAFE && !flag('headless');
+  if (flag('live') || ((R.searchLive || domOK) && !flag('headless'))) return liveSearch(keyword, sort, min, max, limit, page0);
   const url = searchUrl(keyword, sort, min, max, page0);
   // the page fires an unfiltered search first — only accept the XHR carrying our params
   const must = [BY[sort] || BY.relevancy, ...(min ? [`price_min=${min}`] : []), ...(max ? [`price_max=${max}`] : [])];
@@ -138,7 +144,7 @@ async function liveItem(url) {
 async function item() {
   const url = argv[1];
   if (!url) throw new Error('item needs a product url');
-  if ((R.searchLive && !flag('headless')) || flag('live')) return liveItem(url);
+  if (flag('live') || ((R.searchLive || DOM_SAFE) && !flag('headless'))) return liveItem(url);
   return withPage(async (page) => {
     const cap = captureJson(page, (r) => /\/api\/v4\/(pdp\/get_pc|item\/get)/.test(r.url()), (j) => j?.data?.item || null);
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
