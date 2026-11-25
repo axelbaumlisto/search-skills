@@ -388,6 +388,14 @@ async function files(page, name) {
   return list;
 }
 
+/** Файлы-вложения, которые на самом деле картинки (резюме, скрины, чеки).
+ *  Zalo отправляет такое как file-message-v2 с download-кнопкой, а не как
+ *  photo-message-v2, поэтому getimg/photos их не видят — нужен отдельный путь. */
+async function photoFiles(page, name) {
+  const all = await files(page, name);
+  return all.filter(f => /\.(png|jpe?g|webp|gif|bmp|heic)$/i.test(f.name));
+}
+
 /** Скачать файл из диалога.
  *
  *  Zalo расшифровывает вложение в браузере и отдаёт нативной загрузкой: href
@@ -702,7 +710,18 @@ if (cmd === 'tabs') {
   } else if (cmd === 'getimg') {
     if (!arg) { console.error('usage: getimg "<чат>" [n]  — n считается с конца, 1 = самое свежее'); process.exit(1); }
     const dir = process.env.ZALO_DOWNLOAD_DIR || join(homedir(), 'Downloads', 'zalo');
-    const saved = await downloadPhoto(page, arg, parseInt(arg2 || '1', 10), dir);
+    // сначала пробуем фото-пузыри; если их нет — берём картинку, пришедшую файлом
+    // (резюме/скрины/чеки: file-message-v2, getimg их раньше не видел)
+    let saved = [];
+    try {
+      saved = await downloadPhoto(page, arg, parseInt(arg2 || '1', 10), dir);
+    } catch (e) {
+      const pics = await photoFiles(page, arg);
+      if (!pics.length) throw e;
+      const one = await download(page, arg, parseInt(arg2 || '1', 10), dir, CFG.sshHost);
+      if (!one) throw e;
+      saved = [one];
+    }
     saved.forEach(x => console.log(x));
   } else if (cmd === 'imgs') {
     if (!arg) { console.error('usage: imgs "<чат>" [сколько] [--dir путь]'); process.exit(1); }
