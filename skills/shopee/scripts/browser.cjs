@@ -14,7 +14,7 @@
 
    Это единственное место, где делается выбор: добавится четвёртый драйвер —
    правка будет здесь, а не в командах скилла. */
-const which = (process.env.SHOPEE_BROWSER || 'bridge').toLowerCase();
+const which = (process.env.SHOPEE_BROWSER || 'container').toLowerCase();
 const remote = which === 'remote' || which === 'remote-browser';   // remote-browser — старое имя
 const container = which === 'container' || which === 'docker';
 const mod = require(container ? './container.cjs' : remote ? './remote.cjs' : './bridge.cjs');
