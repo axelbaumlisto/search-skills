@@ -34,17 +34,30 @@ const searchUrl = (keyword, sort, min, max, page0) => {
  *  [-45%] name ~ ฿ ~ 4,969 [~ ฿ ~ 8,998 ~ -45%] [~ badges] [~ 4.9] [~ 47 sold] [~ 2-5 Days] [~ Location] */
 function parseCard(c) {
   const f = c.t.split(' ~ ').map((s) => s.trim()).filter(Boolean);
-  const num = (s) => Number(String(s).replace(/[^\d.]/g, '')) || null;
-  const prices = [];
-  f.forEach((tok, i) => {
-    if (/^[฿₫]$/.test(tok)) { const v = num(f[i + 1]); if (v) prices.push(v); }
-    else { const m = tok.match(/^[฿₫]\s*([\d.,]+)$/); if (m) prices.push(num(m[1])); }
-  });
-  const soldTok = f.find((t) => /\bsold\b/i.test(t)) || '';
-  const soldM = soldTok.match(/([\d.,]+)\s*(k|m)?\+?\s*sold/i);
+  // VND пишет «66.000» и «1.234.567» — точка это разделитель тысяч, не десятичная.
+  // THB пишет «1,234.50» — запятая тысячи, точка копейки, поэтому для THB
+  // убираем запятые, а для VND — все точки. Иначе 66.000 → 66.
+  const num = (s) => {
+    const t = String(s).replace(/[^\d.,]/g, '');
+    const clean = R.currency === 'VND'
+      ? t.replace(/[.,]/g, '')
+      : t.replace(/,/g, '');
+    return Number(clean) || null;
+  };
+  // Цена идёт ПЕРЕД символом: «59.400 ~ ₫ ~ 66.000 ~ ₫». Поэтому собираем
+  // любые чисто-денежные токены, пропуская проценты и рейтинги.
+  const isMoney = (s) => /^[\d.,]+$/.test(s) && /[.,]/.test(s);
+  const priceTokens = f.map((s, i) => ({ s, i }))
+    .filter(({ s }) => isMoney(s) && !/^-/.test(s))
+    .map(({ s }) => num(s))
+    .filter((v) => v && v > 100);
+  // Токен сразу после ₫/฿ или перед ним — тот же список; dedupe подряд идущих
+  const prices = priceTokens.filter((v, i, a) => a.indexOf(v) === i);
+  const soldTok = f.find((t) => /\bsold\b|đã bán/i.test(t)) || '';
+  const soldM = soldTok.match(/([\d.,]+)\s*(k|m)?\+?\s*(?:sold|đã bán)/i);
   const soldN = soldM ? Math.round(num(soldM[1]) * ({ k: 1e3, m: 1e6 }[(soldM[2] || '').toLowerCase()] || 1)) : null;
   // the grid shows either lifetime "2k+ sold" or "982 Sold/Month" — never both
-  const monthly = /sold\s*\/\s*month/i.test(soldTok);
+  const monthly = /sold\s*\/\s*month|đã bán\s*\/\s*tháng/i.test(soldTok);
   const discTok = f.filter((t) => /^-\d+%$/.test(t)).pop();
   const rating = Number(f.find((t) => /^[0-5](\.\d+)?$/.test(t)) || 0) || null;
   const name = f.find((t) => t.length > 8 && !/^-\d+%$/.test(t) && !/^[฿₫]/.test(t)) || null;
@@ -53,7 +66,7 @@ function parseCard(c) {
   return {
     name,
     [R.priceKey('price')]: prices[0] ?? null,
-    [R.priceKey('original_price')]: prices[1] ?? null,
+    [R.priceKey('original_price')]: prices[1] && prices[1] > prices[0] ? prices[1] : null,
     discount_pct: discTok ? Math.abs(Number(discTok.replace(/[^\d]/g, ''))) : null,
     sold: monthly ? null : soldN,
     sold_month: monthly ? soldN : null,

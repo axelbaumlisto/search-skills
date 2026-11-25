@@ -30,7 +30,9 @@
 
   return JSON.stringify({
     title,
-    price_text: pick(/([฿₫]\s?[\d.,]+(?:\s*-\s*[฿₫]?\s?[\d.,]+)?)/, head),
+    // VN пишет «61.110₫» (символ СЗАДИ), TH — «฿1,234» (СПЕРЕДИ).
+    // Один regex на оба порядка: сначала символ-число, потом число-символ.
+    price_text: pick(/([฿₫]\s?[\d.,]+(?:\s*-\s*[฿₫]?\s?[\d.,]+)?|[\d.,]+\s?[฿₫])/, head),
     price_block: clean(head).slice(0, 300),
     rating: pick(/\n(\d\.\d)\n[\d.,]+k?\+?\nRatings/),
     sold: pick(/([\d.,]+k?\+?)\s*Sold\b/i),
